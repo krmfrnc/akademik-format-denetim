@@ -155,7 +155,8 @@ function parseStyles(parsedStyles: unknown): Map<string, StyleDefinition> {
 
   try {
     const styleEntries = ensureArray<Record<string, unknown>>(
-      (parsedStyles as Record<string, unknown>)?.styles?.style,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (parsedStyles as any)?.styles?.style,
     );
 
     for (const style of styleEntries) {
@@ -166,20 +167,20 @@ function parseStyles(parsedStyles: unknown): Map<string, StyleDefinition> {
 
       const rPr = (style as Record<string, unknown>)?.rPr as Record<string, unknown> | undefined;
       const pPr = (style as Record<string, unknown>)?.pPr as Record<string, unknown> | undefined;
-      const basedOn = safeGet<string>(pPr ?? {}, "basedOn.@_val", null);
+      const basedOn = safeGet<string | null>(pPr ?? {}, "basedOn.@_val", null);
 
       styleMap.set(styleId, {
         styleId,
         name: name?.toLowerCase() ?? "",
         basedOn,
         rPr: {
-          fontFamily: safeGet<string>(rPr ?? {}, "rFonts.@_ascii", null),
+          fontFamily: safeGet<string | null>(rPr ?? {}, "rFonts.@_ascii", null),
           fontSize: safeGetNumberToPoints(rPr ?? {}, "sz.@_val"),
           bold: parseBoolAttr(rPr?.bold !== undefined, rPr?.bold),
           italic: parseBoolAttr(rPr?.italic !== undefined, rPr?.italic),
         },
         pPr: {
-          alignment: safeGet<string>(pPr ?? {}, "jc.@_val", null),
+          alignment: safeGet<string | null>(pPr ?? {}, "jc.@_val", null),
           lineSpacing: safeGetNumberToLineSpacing(pPr ?? {}, "spacing.@_line"),
           spacingBefore: safeGet<number>(pPr ?? {}, "spacing.@_before", 0),
           spacingAfter: safeGet<number>(pPr ?? {}, "spacing.@_after", 0),
@@ -198,7 +199,8 @@ function parseParagraphs(
   parsedDocument: unknown,
   styles: Map<string, StyleDefinition>,
 ): DocxParagraph[] {
-  const body = (parsedDocument as Record<string, unknown>)?.document?.body as Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body = (parsedDocument as any)?.document?.body as Record<string, unknown>;
   if (!body) return [];
 
   const pElements = ensureArray<Record<string, unknown>>(body.p);
@@ -326,7 +328,8 @@ function parseRuns(pEl: Record<string, unknown>): DocxRun[] {
 }
 
 function parseSections(parsedDocument: unknown): DocxSection[] {
-  const body = (parsedDocument as Record<string, unknown>)?.document?.body as Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body = (parsedDocument as any)?.document?.body as Record<string, unknown>;
   if (!body) return [];
 
   const sectPrElements = ensureArray<Record<string, unknown>>(body.sectPr);
@@ -366,7 +369,8 @@ function parseSections(parsedDocument: unknown): DocxSection[] {
 }
 
 function parseTables(parsedDocument: unknown): DocxTable[] {
-  const body = (parsedDocument as Record<string, unknown>)?.document?.body as Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body = (parsedDocument as any)?.document?.body as Record<string, unknown>;
   if (!body) return [];
 
   const tblElements = ensureArray<Record<string, unknown>>(body.tbl);

@@ -6,6 +6,7 @@ import type {
   SemanticScholarResponse,
   CrossrefWork,
 } from "./types";
+import type { Prisma } from "@prisma/client";
 
 const CROSSREF_API = "https://api.crossref.org/works";
 const SEMANTIC_SCHOLAR_API =
@@ -65,7 +66,7 @@ async function validateSingleCitation(
           isCorrect: true,
           expected: null,
           found: null,
-          issues: { warning: "Doğrulama için kaynak bulunamadı." },
+          issues: { warning: "Doğrulama için kaynak bulunamadı." } as Prisma.JsonValue,
           location: citation.location,
         };
       }
@@ -81,7 +82,7 @@ async function validateSingleCitation(
       isCorrect: true,
       expected: null,
       found: null,
-      issues: { warning: "API doğrulama hatası. Kaynak manuel kontrol edilmeli." },
+      issues: { warning: "API doğrulama hatası. Kaynak manuel kontrol edilmeli." } as Prisma.JsonValue,
       location: citation.location,
     };
   }
@@ -275,7 +276,7 @@ function buildResultFromCrossref(
     isCorrect,
     expected: isCorrect ? null : expected,
     found: isCorrect ? null : citation.text,
-    issues: Object.keys(issues).length > 0 ? issues : null,
+    issues: Object.keys(issues).length > 0 ? (issues as unknown as Prisma.JsonValue) : null,
     location: citation.location,
   };
 }
@@ -336,7 +337,7 @@ function buildResultFromSemanticScholar(
     isCorrect,
     expected: isCorrect ? null : paper.title,
     found: isCorrect ? null : citation.text,
-    issues: Object.keys(issues).length > 0 ? issues : null,
+    issues: Object.keys(issues).length > 0 ? (issues as unknown as Prisma.JsonValue) : null,
     location: citation.location,
   };
 }

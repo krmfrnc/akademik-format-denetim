@@ -54,7 +54,7 @@ export function analyzeMargins(
       const expectedCm = parseCmValue(expectedValue);
       if (expectedCm === null) continue;
 
-      const actualTwips = section[key];
+      const actualTwips = section[key] as number | null;
       const tolerance = 50; // twips (~0.9 mm)
 
       if (actualTwips === null) {

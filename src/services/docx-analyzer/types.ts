@@ -1,4 +1,4 @@
-import type { ViolationType, Severity, JsonValue } from "@prisma/client";
+import type { ViolationType, Severity, Prisma } from "@prisma/client";
 
 export interface FormatRules {
   body?: SectionRules;
@@ -69,7 +69,7 @@ export interface CitationCheckResult {
   isCorrect: boolean;
   expected: string | null;
   found: string | null;
-  issues: JsonValue;
+  issues: Prisma.JsonValue;
   location: string | null;
 }
 

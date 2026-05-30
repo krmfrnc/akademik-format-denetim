@@ -281,7 +281,7 @@ async function runDocumentAnalysis(
         data: {
           status: "ANALYZED",
           completedAt: new Date(),
-          summary: summary as Prisma.InputJsonValue,
+          summary: summary as unknown as Prisma.InputJsonValue,
           creditCost,
         },
       }),
