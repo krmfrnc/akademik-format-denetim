@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { signAccessToken, signRefreshToken } from "@/lib/jwt";
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from "@/lib/jwt";
 import { hashPassword, comparePassword, generateToken, AppError } from "@/lib/utils";
 import { registerSchema, loginSchema, type RegisterInput, type LoginInput } from "@/validators/auth.schema";
 import { User, UserRole } from "@prisma/client";
@@ -216,6 +216,93 @@ async function cleanExpiredRefreshTokens(userId: string): Promise<void> {
     await prisma.refreshToken.deleteMany({
       where: { id: { in: toDelete.map((t) => t.id) } },
     });
+  }
+}
+
+export async function refreshAuth(
+  rawRefreshToken: string,
+): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
+  let payload: { sub: string; jti: string };
+  try {
+    payload = await verifyRefreshToken(rawRefreshToken);
+  } catch {
+    throw new AppError("Geçersiz veya süresi dolmuş oturum.", 401, "INVALID_REFRESH_TOKEN");
+  }
+
+  const storedToken = await prisma.refreshToken.findFirst({
+    where: {
+      token: payload.jti,
+      userId: payload.sub,
+      expiresAt: { gt: new Date() },
+    },
+  });
+
+  if (!storedToken) {
+    throw new AppError("Oturum bulunamadı. Tekrar giriş yapın.", 401, "REFRESH_TOKEN_NOT_FOUND");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: payload.sub },
+  });
+
+  if (!user || !user.isActive) {
+    throw new AppError("Hesap devre dışı.", 403, "ACCOUNT_DISABLED");
+  }
+
+  // Eski refresh token'ı sil, yenisini oluştur (rotation)
+  await prisma.refreshToken.delete({ where: { id: storedToken.id } });
+
+  const newJti = generateToken();
+  const refreshExpiresInStr = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
+
+  const newRefreshToken = await signRefreshToken({
+    sub: user.id,
+    jti: newJti,
+  });
+
+  const refreshExpiresAt = new Date(
+    Date.now() + parseDurationMs(refreshExpiresInStr),
+  );
+
+  await prisma.refreshToken.create({
+    data: {
+      userId: user.id,
+      token: newJti,
+      expiresAt: refreshExpiresAt,
+    },
+  });
+
+  await cleanExpiredRefreshTokens(user.id);
+
+  const accessToken = await signAccessToken({
+    sub: user.id,
+    email: user.email,
+    role: user.role,
+  });
+
+  const expiresIn = parseDurationSeconds(
+    process.env.JWT_ACCESS_EXPIRES_IN || "15m",
+  );
+
+  return {
+    accessToken,
+    refreshToken: newRefreshToken,
+    expiresIn,
+  };
+}
+
+export async function logoutUser(
+  rawRefreshToken: string | null,
+): Promise<void> {
+  if (!rawRefreshToken) return;
+
+  try {
+    const payload = await verifyRefreshToken(rawRefreshToken);
+    await prisma.refreshToken.deleteMany({
+      where: { token: payload.jti, userId: payload.sub },
+    });
+  } catch {
+    // Token geçersiz olsa bile çıkış yapılsın
   }
 }
 
