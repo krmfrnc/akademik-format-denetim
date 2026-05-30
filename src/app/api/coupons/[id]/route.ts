@@ -13,6 +13,14 @@ export async function DELETE(
       return apiError("Yetkisiz erişim.", 403, "FORBIDDEN");
     }
 
+    const coupon = await prisma.coupon.findUnique({
+      where: { id: params.id },
+    });
+
+    if (!coupon) {
+      return apiError("Kupon bulunamadı.", 404, "COUPON_NOT_FOUND");
+    }
+
     await prisma.coupon.delete({ where: { id: params.id } });
 
     return apiSuccess({ message: "Kupon silindi." });

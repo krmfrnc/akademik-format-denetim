@@ -104,6 +104,7 @@ export async function enqueueAnalysis(
 
   const analysis = await prisma.documentAnalysis.create({
     data: {
+      userId,
       documentId,
       formatTemplateId,
       citationStyleId,
@@ -125,8 +126,6 @@ export async function enqueueAnalysis(
 
   return { analysisId: analysis.id };
 }
-
-async function runDocumentAnalysis(
 
 async function runDocumentAnalysis(
   analysisId: string,
@@ -167,9 +166,17 @@ async function runDocumentAnalysis(
     where: { userId },
   });
 
+  if (!isSubscribed && !userCredit) {
+    throw new AppError("Kredi kaydı bulunamadı.", 500, "CREDIT_NOT_FOUND");
+  }
+
   const document = await prisma.document.findUnique({
     where: { id: documentId },
   });
+
+  if (!document) {
+    throw new AppError("Belge bulunamadı.", 404, "DOCUMENT_NOT_FOUND");
+  }
 
   try {
     const response = await fetch(document.fileUrl);
@@ -205,7 +212,7 @@ async function runDocumentAnalysis(
     }
 
     // Sayfa sayısı limit kontrolü (parse sonrası)
-    if (subscription?.plan?.maxFileSizeMB && parsed.pageCount > 500) {
+    if (parsed.pageCount > 500) {
       throw new AppError(
         `Sayfa sayısı (${parsed.pageCount}) plan limitini aşıyor.`,
         400,
@@ -265,10 +272,10 @@ async function runDocumentAnalysis(
       ? 0
       : Math.min(
           CREDIT_COST_PER_ANALYSIS,
-          userCredit.balance,
+          userCredit!.balance,
         );
 
-    await prisma.$transaction([
+    const txOps: Promise<unknown>[] = [
       prisma.documentAnalysis.update({
         where: { id: analysisId },
         data: {
@@ -288,10 +295,10 @@ async function runDocumentAnalysis(
           citationCount: parsed.citationCount,
         },
       }),
-    ]);
+    ];
 
     if (!isSubscribed && creditCost > 0) {
-      await prisma.$transaction([
+      txOps.push(
         prisma.userCredit.update({
           where: { userId },
           data: {
@@ -301,32 +308,38 @@ async function runDocumentAnalysis(
         }),
         prisma.creditTransaction.create({
           data: {
-            userCreditId: userCredit.id,
+            userCreditId: userCredit!.id,
             amount: -creditCost,
             type: "ANALYSIS_COST",
-            description: `Belge analizi: ${document?.originalName ?? "belge"}`,
+            description: `Belge analizi: ${document.originalName ?? "belge"}`,
             referenceId: analysisId,
           },
         }),
-      ]);
+      );
     }
 
     if (isSubscribed && subscription) {
-      await prisma.userSubscription.update({
-        where: { id: subscription.id },
-        data: { analysisUsed: { increment: 1 } },
-      });
+      txOps.push(
+        prisma.userSubscription.update({
+          where: { id: subscription.id },
+          data: { analysisUsed: { increment: 1 } },
+        }),
+      );
     }
 
-    await prisma.notification.create({
-      data: {
-        userId,
-        title: "Analiz Tamamlandı",
-        message: `"${document?.originalName ?? "Belge"}" belgesinin analizi tamamlandı. ${summary.totalViolations} ihlal, ${summary.errorCount} hata tespit edildi.`,
-        type: summary.totalViolations === 0 ? "success" : "warning",
-        link: `/documents/${documentId}`,
-      },
-    });
+    txOps.push(
+      prisma.notification.create({
+        data: {
+          userId,
+          title: "Analiz Tamamlandı",
+          message: `"${document.originalName ?? "Belge"}" belgesinin analizi tamamlandı. ${summary.totalViolations} ihlal, ${summary.errorCount} hata tespit edildi.`,
+          type: summary.totalViolations === 0 ? "success" : "warning",
+          link: `/documents/${documentId}`,
+        },
+      }),
+    );
+
+    await prisma.$transaction(txOps as Prisma.PrismaPromise<unknown>[]);
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Bilinmeyen hata";
@@ -351,8 +364,6 @@ async function runDocumentAnalysis(
         },
       }),
     ]);
-
-    throw error;
   }
 }
 

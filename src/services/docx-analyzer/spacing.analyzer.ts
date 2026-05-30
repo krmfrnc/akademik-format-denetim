@@ -146,15 +146,6 @@ function checkAlignment(
   const expectedAlignment = rule.alignment as string | undefined;
   if (!expectedAlignment) return;
 
-  const alignmentMap: Record<string, string> = {
-    both: "justify",
-    justify: "justify",
-    left: "left",
-    right: "right",
-    center: "center",
-    centre: "center",
-  };
-
   const normalizedExpected = normalizeAlignment(expectedAlignment);
   const foundAlignment = para.alignment ?? "belirtilmemiş";
   const normalizedFound = normalizeAlignment(foundAlignment);

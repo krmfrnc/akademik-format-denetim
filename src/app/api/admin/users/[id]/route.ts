@@ -24,6 +24,19 @@ export async function PUT(
       return apiError("Güncellenecek alan bulunamadı.", 400);
     }
 
+    const targetUser = await prisma.user.findUnique({
+      where: { id: params.id },
+      select: { id: true },
+    });
+
+    if (!targetUser) {
+      return apiError("Kullanıcı bulunamadı.", 404, "USER_NOT_FOUND");
+    }
+
+    if (params.id === admin.sub) {
+      return apiError("Kendi hesabınızı buradan güncelleyemezsiniz.", 403, "SELF_UPDATE_FORBIDDEN");
+    }
+
     await prisma.user.update({
       where: { id: params.id },
       data: updateData,

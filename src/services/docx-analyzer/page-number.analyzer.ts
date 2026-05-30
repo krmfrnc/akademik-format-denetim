@@ -50,8 +50,6 @@ export function analyzePageNumbers(
     if (!actualFormat) continue;
 
     const isCurrentlyRoman = isRoman(actualFormat);
-    const isCurrentlyDecimal = actualFormat === "decimal" || actualFormat === "none" || !actualFormat;
-
     if (expectedFormat === "roman" && !isCurrentlyRoman) {
       violations.push({
         type: "PAGE_NUMBER",

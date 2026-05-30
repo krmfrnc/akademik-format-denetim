@@ -124,23 +124,17 @@ async function searchCrossref(
       ? `${CROSSREF_API}/${encodeURIComponent(query)}`
       : `${CROSSREF_API}?query=${encodeURIComponent(query)}&rows=1`;
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-    const externalSignal = signal;
-    if (externalSignal) {
-      externalSignal.addEventListener("abort", () => controller.abort());
-    }
+    const fetchSignal = signal
+      ? AbortSignal.any([AbortSignal.timeout(REQUEST_TIMEOUT_MS), signal])
+      : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
 
     const response = await fetch(url, {
       headers: {
         "User-Agent": USER_AGENT,
         Accept: "application/json",
       },
-      signal: controller.signal,
+      signal: fetchSignal,
     });
-
-    clearTimeout(timeoutId);
 
     if (!response.ok) return null;
 
@@ -166,22 +160,16 @@ async function searchSemanticScholar(
   try {
     const url = `${SEMANTIC_SCHOLAR_API}?query=${encodeURIComponent(query)}&limit=1&fields=title,authors,year,journal,externalIds,publicationVenue,url`;
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-    const externalSignal = signal;
-    if (externalSignal) {
-      externalSignal.addEventListener("abort", () => controller.abort());
-    }
+    const fetchSignal = signal
+      ? AbortSignal.any([AbortSignal.timeout(REQUEST_TIMEOUT_MS), signal])
+      : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
 
     const response = await fetch(url, {
       headers: {
         Accept: "application/json",
       },
-      signal: controller.signal,
+      signal: fetchSignal,
     });
-
-    clearTimeout(timeoutId);
 
     if (!response.ok) return null;
 

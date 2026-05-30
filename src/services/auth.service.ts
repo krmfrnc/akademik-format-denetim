@@ -67,34 +67,30 @@ export async function registerUser(input: RegisterInput): Promise<{
       surname: surname ?? null,
       credit: {
         create: {
-          balance: 0,
-          lifetimeEarned: 0,
+          balance: 3,
+          lifetimeEarned: 3,
           lifetimeSpent: 0,
         },
       },
     },
+    include: { credit: true },
   });
+
+  if (!user.credit) {
+    throw new AppError("Kredi kaydı oluşturulamadı.", 500, "CREDIT_CREATION_FAILED");
+  }
 
   try {
     await prisma.creditTransaction.create({
       data: {
-        userCreditId: user.id,
+        userCreditId: user.credit.id,
         amount: 3,
         type: "REGISTRATION",
         description: "Kayıt bonusu - 3 ücretsiz kredi",
       },
     });
-
-    await prisma.userCredit.update({
-      where: { userId: user.id },
-      data: {
-        balance: { increment: 3 },
-        lifetimeEarned: { increment: 3 },
-      },
-    });
-  } catch {
-    // Bonus kredi verilemezse kaydı iptal etme
-    void 0;
+  } catch (err) {
+    console.error("Registration bonus credit transaction failed:", err);
   }
 
   const tokens = await generateAndStoreTokens(user.id, user.email, user.role);

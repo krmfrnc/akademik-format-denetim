@@ -140,6 +140,8 @@ model User {
   invoices            Invoice[]
   payments            Payment[]
   couponUsages        CouponUsage[]
+  createdCoupons      Coupon[]
+  notifications       Notification[]
   auditLogs           AuditLog[]
 
   @@index([email])
@@ -261,6 +263,7 @@ model Document {
 
 model DocumentAnalysis {
   id               String         @id @default(cuid())
+  userId           String
   documentId       String
   formatTemplateId String?
   citationStyleId  String?
@@ -271,12 +274,14 @@ model DocumentAnalysis {
   completedAt      DateTime?
   createdAt        DateTime       @default(now())
 
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   document      Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
   formatTemplate FormatTemplate? @relation(fields: [formatTemplateId], references: [id], onDelete: SetNull)
   citationStyle  CitationStyle?  @relation(fields: [citationStyleId], references: [id], onDelete: SetNull)
   violations    AnalysisViolation[]
   citationResults CitationCheck[]
 
+  @@index([userId])
   @@index([documentId])
   @@index([documentId, createdAt(sort: Desc)])
 }

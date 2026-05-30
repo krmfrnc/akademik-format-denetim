@@ -61,6 +61,19 @@ function createXmlParser(): XMLParser {
   });
 }
 
+function parseBoolAttr(present: boolean, val: unknown): boolean | null {
+  if (!present) return null;
+  if (val === undefined || val === null || val === "") return true;
+  if (typeof val === "object") {
+    const v = (val as Record<string, unknown>)["@_val"];
+    if (typeof v === "string") {
+      const lower = v.toLowerCase();
+      if (lower === "false" || lower === "0" || lower === "off") return false;
+    }
+  }
+  return true;
+}
+
 function safeGet<T>(obj: unknown, path: string, fallback: T): T {
   try {
     const keys = path.split(".");
@@ -162,8 +175,8 @@ function parseStyles(parsedStyles: unknown): Map<string, StyleDefinition> {
         rPr: {
           fontFamily: safeGet<string>(rPr ?? {}, "rFonts.@_ascii", null),
           fontSize: safeGetNumberToPoints(rPr ?? {}, "sz.@_val"),
-          bold: rPr?.bold !== undefined ? true : null,
-          italic: rPr?.italic !== undefined ? true : null,
+          bold: parseBoolAttr(rPr?.bold !== undefined, rPr?.bold),
+          italic: parseBoolAttr(rPr?.italic !== undefined, rPr?.italic),
         },
         pPr: {
           alignment: safeGet<string>(pPr ?? {}, "jc.@_val", null),
@@ -293,9 +306,9 @@ function parseRuns(pEl: Record<string, unknown>): DocxRun[] {
         text,
         fontFamily: safeGet<string | null>(rPr, "rFonts.@_ascii", null),
         fontSize: safeGetNumberToPoints(rPr, "sz.@_val"),
-        bold: rPr.bold !== undefined,
-        italic: rPr.italic !== undefined,
-        underline: rPr.u !== undefined,
+        bold: parseBoolAttr(rPr.bold !== undefined, rPr.bold) ?? false,
+        italic: parseBoolAttr(rPr.italic !== undefined, rPr.italic) ?? false,
+        underline: parseBoolAttr(rPr.u !== undefined, rPr.u) ?? false,
       });
     } catch {
       runs.push({
@@ -480,12 +493,10 @@ export function classifyParagraphSection(
   if (!styleName) return defaultSection;
 
   if (
-    styleName.includes("heading") ||
-    styleName.includes("başlık") ||
-    styleName.includes("heading 1") ||
-    styleName.includes("başlık 1")
+    styleName.includes("heading 3") ||
+    styleName.includes("başlık 3")
   ) {
-    return styleName.includes("1") ? "heading1" : "heading2";
+    return "heading3";
   }
   if (
     styleName.includes("heading 2") ||
@@ -494,10 +505,10 @@ export function classifyParagraphSection(
     return "heading2";
   }
   if (
-    styleName.includes("heading 3") ||
-    styleName.includes("başlık 3")
+    styleName.includes("heading") ||
+    styleName.includes("başlık")
   ) {
-    return "heading3";
+    return "heading1";
   }
   if (styleName.includes("abstract") || styleName.includes("öz")) {
     return "abstract";

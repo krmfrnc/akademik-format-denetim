@@ -1,3 +1,6 @@
+// NOT: Bu in-memory rate limiter yalnızca tek süreçli (stateful) sunucularda çalışır.
+// Serverless ortamlarda (Vercel, AWS Lambda) her istek yeni bir Map alır ve limitler sıfırlanır.
+// Production'da Redis tabanlı bir çözüme (örn. @upstash/ratelimit) geçilmelidir.
 const store = new Map<string, { count: number; resetAt: number }>();
 
 setInterval(() => {

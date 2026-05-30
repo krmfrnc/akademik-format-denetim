@@ -134,7 +134,7 @@ export async function apiUpload<T = unknown>(
   });
 }
 
-export function getAuthUser(): { id: string; name: string; email: string; role: string } | null {
+export function getClientAuthUser(): { id: string; name: string; email: string; role: string } | null {
   if (typeof window === "undefined") return null;
   const stored = localStorage.getItem("auth_user");
   if (!stored) return null;
