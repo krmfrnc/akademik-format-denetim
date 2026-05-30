@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/get-auth-user";
 import { apiSuccess, apiError } from "@/lib/utils";
+import type { Prisma } from "@prisma/client";
 
 export async function PUT(
   request: NextRequest,
@@ -48,7 +49,7 @@ export async function PUT(
         action: "user.updated",
         entity: "User",
         entityId: params.id,
-        changes: updateData,
+        changes: updateData as Prisma.InputJsonValue,
       },
     });
 
