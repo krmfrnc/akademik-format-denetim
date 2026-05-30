@@ -67,15 +67,7 @@ function safeGet<T>(obj: unknown, path: string, fallback: T): T {
     let current: unknown = obj;
     for (const key of keys) {
       if (current === null || current === undefined) return fallback;
-      if (Array.isArray(current)) {
-        const arr = current as Record<string, unknown>[];
-        const merged: Record<string, unknown> = {};
-        for (const item of arr) {
-          current = item[key];
-        }
-      } else {
-        current = (current as Record<string, unknown>)[key];
-      }
+      current = (current as Record<string, unknown>)[key];
     }
     return (current as T) ?? fallback;
   } catch {

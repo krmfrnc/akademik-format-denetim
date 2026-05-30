@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { runDocumentAnalysis } from "@/services/document.service";
+import { enqueueAnalysis } from "@/services/document.service";
 import { getAuthUser } from "@/lib/get-auth-user";
 import { AppError, apiSuccess, apiError } from "@/lib/utils";
 
@@ -29,7 +29,7 @@ export async function POST(
       // JSON body olmayabilir, sadece belge analizi
     }
 
-    await runDocumentAnalysis({
+    const { analysisId } = await enqueueAnalysis({
       documentId,
       userId: user.sub,
       formatTemplateId,
@@ -39,9 +39,10 @@ export async function POST(
     return apiSuccess(
       {
         documentId,
-        message: "Analiz başarıyla tamamlandı.",
+        analysisId,
+        message: "Analiz kuyruğa alındı. Sonuçlar hazır olduğunda bildirileceksiniz.",
       },
-      200,
+      202,
     );
   } catch (error) {
     if (error instanceof AppError) {
@@ -49,6 +50,6 @@ export async function POST(
     }
 
     console.error("POST /api/documents/[id]/analyze error:", error);
-    return apiError("Analiz sırasında bir hata oluştu.", 500, "ANALYSIS_ERROR");
+    return apiError("Analiz başlatılırken bir hata oluştu.", 500, "ANALYSIS_ERROR");
   }
 }

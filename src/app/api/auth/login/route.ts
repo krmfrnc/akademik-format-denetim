@@ -1,6 +1,6 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { loginUser } from "@/services/auth.service";
-import { AppError, apiSuccess, apiError } from "@/lib/utils";
+import { AppError, apiError } from "@/lib/utils";
 
 export async function POST(request: NextRequest): Promise<Response> {
   try {
@@ -8,14 +8,35 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const result = await loginUser(body);
 
-    return apiSuccess({
-      user: result.user,
-      tokens: {
-        accessToken: result.tokens.accessToken,
-        refreshToken: result.tokens.refreshToken,
-        expiresIn: result.tokens.expiresIn,
+    const response = NextResponse.json({
+      success: true,
+      data: {
+        user: result.user,
+        tokens: {
+          accessToken: result.tokens.accessToken,
+          refreshToken: result.tokens.refreshToken,
+          expiresIn: result.tokens.expiresIn,
+        },
       },
     });
+
+    response.cookies.set("access_token", result.tokens.accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: result.tokens.expiresIn,
+    });
+
+    response.cookies.set("refresh_token", result.tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60,
+    });
+
+    return response;
   } catch (error) {
     if (error instanceof AppError) {
       return apiError(error.message, error.statusCode, error.code);

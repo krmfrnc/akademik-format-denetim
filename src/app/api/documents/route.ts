@@ -155,11 +155,12 @@ export async function POST(request: NextRequest): Promise<Response> {
     } else {
       const fs = await import("fs/promises");
       const path = await import("path");
+      const crypto = await import("crypto");
 
       const uploadDir = path.join(process.cwd(), storagePath, user.sub);
       await fs.mkdir(uploadDir, { recursive: true });
 
-      const uniqueName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const uniqueName = `${crypto.randomUUID()}.docx`;
       const filePath = path.join(uploadDir, uniqueName);
 
       await fs.writeFile(filePath, buffer);

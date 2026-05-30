@@ -6,6 +6,9 @@ interface FileUploadZoneProps {
   onFileSelected: (file: File) => void;
   disabled?: boolean;
   maxSizeMB?: number;
+  uploadProgress?: number;
+  isUploading?: boolean;
+  onRemove?: () => void;
 }
 
 const MAX_FILE_SIZE_MB = 100;
@@ -18,12 +21,13 @@ export default function FileUploadZone({
   onFileSelected,
   disabled = false,
   maxSizeMB = MAX_FILE_SIZE_MB,
+  uploadProgress = 0,
+  isUploading = false,
+  onRemove,
 }: FileUploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const validateFile = useCallback(
@@ -103,11 +107,10 @@ export default function FileUploadZone({
   const handleRemove = () => {
     setSelectedFile(null);
     setError(null);
-    setUploadProgress(0);
-    setIsUploading(false);
     if (inputRef.current) {
       inputRef.current.value = "";
     }
+    onRemove?.();
   };
 
   const formatSize = (bytes: number): string => {

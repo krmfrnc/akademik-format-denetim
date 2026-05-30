@@ -19,7 +19,6 @@ import type {
 import type { Prisma } from "@prisma/client";
 
 const CREDIT_COST_PER_ANALYSIS = 1;
-const COMPLEXITY_CREDIT_THRESHOLD = 30;
 
 interface RunAnalysisParams {
   documentId: string;
@@ -40,11 +39,9 @@ interface AnalysisSummary {
   processingTimeMs: number;
 }
 
-export async function runDocumentAnalysis(
+export async function enqueueAnalysis(
   params: RunAnalysisParams,
-): Promise<void> {
-  const startedAt = Date.now();
-
+): Promise<{ analysisId: string }> {
   const { documentId, userId, formatTemplateId, citationStyleId } = params;
 
   const document = await prisma.document.findFirst({
@@ -63,14 +60,6 @@ export async function runDocumentAnalysis(
     where: { userId },
   });
 
-  if (!userCredit || userCredit.balance < CREDIT_COST_PER_ANALYSIS) {
-    throw new AppError(
-      "Yetersiz kredi. Lütfen kredi satın alın.",
-      402,
-      "INSUFFICIENT_CREDITS",
-    );
-  }
-
   const subscription = await prisma.userSubscription.findUnique({
     where: { userId },
     include: { plan: true },
@@ -78,6 +67,14 @@ export async function runDocumentAnalysis(
 
   const isSubscribed =
     subscription?.status === "ACTIVE" || subscription?.status === "TRIAL";
+
+  if (!isSubscribed && (!userCredit || userCredit.balance < CREDIT_COST_PER_ANALYSIS)) {
+    throw new AppError(
+      "Yetersiz kredi. Lütfen kredi satın alın.",
+      402,
+      "INSUFFICIENT_CREDITS",
+    );
+  }
 
   const analysisLimit = subscription?.plan?.analysisLimit ?? null;
   if (
@@ -90,26 +87,6 @@ export async function runDocumentAnalysis(
       402,
       "ANALYSIS_LIMIT_REACHED",
     );
-  }
-
-  let formatRules: FormatRules | null = null;
-  if (formatTemplateId) {
-    const template = await prisma.formatTemplate.findUnique({
-      where: { id: formatTemplateId },
-    });
-    if (template && template.rules) {
-      formatRules = template.rules as unknown as FormatRules;
-    }
-  }
-
-  let citationStyle: CitationStyleRules | null = null;
-  if (citationStyleId) {
-    const style = await prisma.citationStyle.findUnique({
-      where: { id: citationStyleId },
-    });
-    if (style && style.rules) {
-      citationStyle = style.rules as unknown as CitationStyleRules;
-    }
   }
 
   const maxConcurrent = subscription?.plan?.concurrentLimit ?? 1;
@@ -132,13 +109,66 @@ export async function runDocumentAnalysis(
       citationStyleId,
       status: "PROCESSING",
       creditCost: isSubscribed ? 0 : CREDIT_COST_PER_ANALYSIS,
-      startedAt: new Date(startedAt),
+      startedAt: new Date(),
     },
   });
 
   await prisma.document.update({
     where: { id: documentId },
     data: { status: "PROCESSING" },
+  });
+
+  // Arka planda çalıştır — response çoktan döndü, fonksiyon devam eder
+  runDocumentAnalysis(analysis.id, params).catch(async (err) => {
+    console.error("Background analysis failed:", err);
+  });
+
+  return { analysisId: analysis.id };
+}
+
+async function runDocumentAnalysis(
+
+async function runDocumentAnalysis(
+  analysisId: string,
+  params: RunAnalysisParams,
+): Promise<void> {
+  const startedAt = Date.now();
+  const { documentId, userId, formatTemplateId, citationStyleId } = params;
+
+  let formatRules: FormatRules | null = null;
+  if (formatTemplateId) {
+    const template = await prisma.formatTemplate.findUnique({
+      where: { id: formatTemplateId },
+    });
+    if (template && template.rules) {
+      formatRules = template.rules as unknown as FormatRules;
+    }
+  }
+
+  let citationStyle: CitationStyleRules | null = null;
+  if (citationStyleId) {
+    const style = await prisma.citationStyle.findUnique({
+      where: { id: citationStyleId },
+    });
+    if (style && style.rules) {
+      citationStyle = style.rules as unknown as CitationStyleRules;
+    }
+  }
+
+  const subscription = await prisma.userSubscription.findUnique({
+    where: { userId },
+    include: { plan: true },
+  });
+
+  const isSubscribed =
+    subscription?.status === "ACTIVE" || subscription?.status === "TRIAL";
+
+  const userCredit = await prisma.userCredit.findUnique({
+    where: { userId },
+  });
+
+  const document = await prisma.document.findUnique({
+    where: { id: documentId },
   });
 
   try {
@@ -175,13 +205,12 @@ export async function runDocumentAnalysis(
     }
 
     // Sayfa sayısı limit kontrolü (parse sonrası)
-    const maxPageLimit = subscription?.plan?.analysisLimit
-      ? undefined
-      : null; // plana sayfa limiti eklenirse burada kontrol edilecek
-
-    if (subscription?.plan?.maxFileSizeMB) {
-      // Parse edilmiş sayfa sayısına göre check (sayfa başı ~300 kelime = ~1.5 KB XML)
-      // Belirli bir sayfa sınırı plana özel olarak eklenebilir
+    if (subscription?.plan?.maxFileSizeMB && parsed.pageCount > 500) {
+      throw new AppError(
+        `Sayfa sayısı (${parsed.pageCount}) plan limitini aşıyor.`,
+        400,
+        "PAGE_COUNT_LIMIT",
+      );
     }
 
     const extractedCitations = extractCitations(
@@ -196,7 +225,7 @@ export async function runDocumentAnalysis(
     if (violations.length > 0) {
       await prisma.analysisViolation.createMany({
         data: violations.map((v) => ({
-          analysisId: analysis.id,
+          analysisId,
           type: v.type,
           severity: v.severity,
           section: v.section,
@@ -212,7 +241,7 @@ export async function runDocumentAnalysis(
     if (citationResults.length > 0) {
       await prisma.citationCheck.createMany({
         data: citationResults.map((c) => ({
-          analysisId: analysis.id,
+          analysisId,
           citationText: c.citationText,
           sourceType: c.sourceType,
           isCorrect: c.isCorrect,
@@ -241,7 +270,7 @@ export async function runDocumentAnalysis(
 
     await prisma.$transaction([
       prisma.documentAnalysis.update({
-        where: { id: analysis.id },
+        where: { id: analysisId },
         data: {
           status: "ANALYZED",
           completedAt: new Date(),
@@ -275,8 +304,8 @@ export async function runDocumentAnalysis(
             userCreditId: userCredit.id,
             amount: -creditCost,
             type: "ANALYSIS_COST",
-            description: `Belge analizi: ${document.originalName}`,
-            referenceId: analysis.id,
+            description: `Belge analizi: ${document?.originalName ?? "belge"}`,
+            referenceId: analysisId,
           },
         }),
       ]);
@@ -293,7 +322,7 @@ export async function runDocumentAnalysis(
       data: {
         userId,
         title: "Analiz Tamamlandı",
-        message: `"${document.originalName}" belgesinin analizi tamamlandı. ${summary.totalViolations} ihlal, ${summary.errorCount} hata tespit edildi.`,
+        message: `"${document?.originalName ?? "Belge"}" belgesinin analizi tamamlandı. ${summary.totalViolations} ihlal, ${summary.errorCount} hata tespit edildi.`,
         type: summary.totalViolations === 0 ? "success" : "warning",
         link: `/documents/${documentId}`,
       },
@@ -311,7 +340,7 @@ export async function runDocumentAnalysis(
         },
       }),
       prisma.documentAnalysis.update({
-        where: { id: analysis.id },
+        where: { id: analysisId },
         data: {
           status: "FAILED",
           completedAt: new Date(),
@@ -332,7 +361,6 @@ function buildSummary(
   citationResults: CitationCheckResult[],
   processingTimeMs: number,
 ): AnalysisSummary {
-  let totalViolations = violations.length;
   let errorCount = 0;
   let warningCount = 0;
   let infoCount = 0;
@@ -351,22 +379,24 @@ function buildSummary(
     }
   }
 
+  let citationErrorCount = 0;
   for (const c of citationResults) {
-    totalViolations++;
-    if (c.isCorrect) {
-      infoCount++;
-    } else {
+    if (!c.isCorrect) {
+      citationErrorCount++;
       errorCount++;
     }
   }
+
+  const totalViolations = violations.length + citationErrorCount;
 
   const violationCategories: Record<string, number> = {};
   for (const v of violations) {
     const cat = v.type.toLowerCase();
     violationCategories[cat] = (violationCategories[cat] || 0) + 1;
   }
-  violationCategories["citation"] =
-    (violationCategories["citation"] || 0) + citationResults.length;
+  if (citationErrorCount > 0) {
+    violationCategories["citation"] = citationErrorCount;
+  }
 
   const formatScore = calculateFormatScore(violations);
   const citationScore = calculateCitationScore(citationResults);

@@ -231,6 +231,13 @@ export default function DocumentsPage() {
           <FileUploadZone
             onFileSelected={handleFileSelected}
             disabled={uploading}
+            uploadProgress={uploadProgress}
+            isUploading={uploading}
+            onRemove={() => {
+              setSelectedFile(null);
+              setUploadError(null);
+              setUploadProgress(0);
+            }}
           />
 
           <div className="grid gap-4 sm:grid-cols-2">
