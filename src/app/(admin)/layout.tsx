@@ -13,7 +13,7 @@ interface AuthState {
 
 const adminNavItems = [
   {
-    href: "/users",
+    href: "/admin/users",
     label: "Kullanıcılar",
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -22,7 +22,7 @@ const adminNavItems = [
     ),
   },
   {
-    href: "/formats",
+    href: "/admin/formats",
     label: "Format Şablonları",
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -32,7 +32,7 @@ const adminNavItems = [
     ),
   },
   {
-    href: "/citations",
+    href: "/admin/citations",
     label: "Atıf Stilleri",
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -41,7 +41,7 @@ const adminNavItems = [
     ),
   },
   {
-    href: "/plans",
+    href: "/admin/plans",
     label: "Abonelik Planları",
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -50,7 +50,7 @@ const adminNavItems = [
     ),
   },
   {
-    href: "/coupons",
+    href: "/admin/coupons",
     label: "Kupon Yönetimi",
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -59,7 +59,7 @@ const adminNavItems = [
     ),
   },
   {
-    href: "/config",
+    href: "/admin/config",
     label: "Sistem Ayarları",
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">

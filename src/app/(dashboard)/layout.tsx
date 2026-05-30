@@ -136,6 +136,25 @@ export default function DashboardLayout({
               </Link>
             );
           })}
+
+          {user && (user.role === "ADMIN" || user.role === "SUPER_ADMIN") && (
+            <>
+              <div className="my-2 border-t border-gray-100" />
+              <Link
+                href="/admin/users"
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  pathname.startsWith("/admin")
+                    ? "bg-indigo-50 text-indigo-700"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                }`}
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
+                </svg>
+                Admin Paneli
+              </Link>
+            </>
+          )}
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 border-t border-gray-200 p-4">
