@@ -1,0 +1,580 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum DocumentStatus {
+  UPLOADED
+  PROCESSING
+  ANALYZED
+  FAILED
+}
+
+enum ViolationType {
+  FONT_FAMILY
+  FONT_SIZE
+  LINE_SPACING
+  MARGIN_LEFT
+  MARGIN_RIGHT
+  MARGIN_TOP
+  MARGIN_BOTTOM
+  ALIGNMENT
+  FIRST_LINE_INDENT
+  PARAGRAPH_SPACING
+  HEADING_FORMAT
+  PAGE_NUMBER
+  BOLD
+  ITALIC
+  CITATION_INLINE
+  CITATION_BIBLIOGRAPHY
+  OTHER
+}
+
+enum Severity {
+  ERROR
+  WARNING
+  INFO
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE
+}
+
+enum CouponTargetType {
+  ALL_USERS
+  SPECIFIC_USERS
+  EMAIL_DOMAIN
+  NEW_USERS_ONLY
+}
+
+enum InvoiceType {
+  SUBSCRIPTION
+  CREDIT_PACKAGE
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  IYZICO
+  STRIPE
+  PAYPAL
+  MANUAL
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PAUSED
+  TRIAL
+}
+
+enum PlanInterval {
+  MONTHLY
+  YEARLY
+  LIFETIME
+}
+
+enum CreditTransactionType {
+  PURCHASE
+  COUPON_BONUS
+  ADMIN_GIFT
+  REGISTRATION
+  ANALYSIS_COST
+  REFUND
+}
+
+enum TokenType {
+  EMAIL_VERIFY
+  PASSWORD_RESET
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String
+  name            String
+  surname         String?
+  role            UserRole  @default(USER)
+  emailVerified   Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  profile             UserProfile?
+  refreshTokens       RefreshToken[]
+  verificationTokens  VerificationToken[]
+  documents           Document[]
+  formatTemplates     FormatTemplate[]
+  citationStyles      CitationStyle[]
+  analyses            DocumentAnalysis[]
+  credit              UserCredit?
+  subscription        UserSubscription?
+  invoices            Invoice[]
+  payments            Payment[]
+  couponUsages        CouponUsage[]
+  auditLogs           AuditLog[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model UserProfile {
+  id            String  @id @default(cuid())
+  userId        String  @unique
+  university    String?
+  department    String?
+  studentId     String?
+  academicTitle String?
+  phone         String?
+  avatarUrl     String?
+  bio           String? @db.Text
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model VerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  type      TokenType
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@index([token])
+}
+
+model FormatTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  isSystem    Boolean  @default(false)
+  isPublic    Boolean  @default(false)
+  parentId    String?
+  createdBy   String?
+  rules       Json
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creator  User?            @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  parent   FormatTemplate?  @relation("FormatTemplateInheritance", fields: [parentId], references: [id], onDelete: SetNull)
+  children FormatTemplate[] @relation("FormatTemplateInheritance")
+  analyses DocumentAnalysis[]
+
+  @@index([createdBy])
+  @@index([isSystem])
+  @@index([parentId])
+}
+
+model CitationStyle {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  shortName   String?
+  description String?  @db.Text
+  isSystem    Boolean  @default(false)
+  parentId    String?
+  createdBy   String?
+  rules       Json
+  icon        String?
+  isActive    Boolean  @default(true)
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creator  User?           @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  parent   CitationStyle?  @relation("CitationStyleInheritance", fields: [parentId], references: [id], onDelete: SetNull)
+  children CitationStyle[] @relation("CitationStyleInheritance")
+  analyses DocumentAnalysis[]
+
+  @@index([createdBy])
+  @@index([isSystem])
+  @@index([parentId])
+}
+
+model Document {
+  id           String         @id @default(cuid())
+  userId       String
+  fileName     String
+  originalName String
+  fileUrl      String
+  fileSize     Int
+  mimeType     String         @default("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+  status       DocumentStatus @default(UPLOADED)
+  pageCount    Int?
+  wordCount    Int?
+  citationCount Int?
+  errorMessage String?        @db.Text
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analyses DocumentAnalysis[]
+
+  @@index([userId, status])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model DocumentAnalysis {
+  id               String         @id @default(cuid())
+  documentId       String
+  formatTemplateId String?
+  citationStyleId  String?
+  status           DocumentStatus @default(PROCESSING)
+  creditCost       Int            @default(0)
+  summary          Json?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime       @default(now())
+
+  document      Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  formatTemplate FormatTemplate? @relation(fields: [formatTemplateId], references: [id], onDelete: SetNull)
+  citationStyle  CitationStyle?  @relation(fields: [citationStyleId], references: [id], onDelete: SetNull)
+  violations    AnalysisViolation[]
+  citationResults CitationCheck[]
+
+  @@index([documentId])
+  @@index([documentId, createdAt(sort: Desc)])
+}
+
+model AnalysisViolation {
+  id          String        @id @default(cuid())
+  analysisId  String
+  type        ViolationType
+  severity    Severity
+  section     String?
+  location    String?
+  description String        @db.Text
+  expected    String
+  found       String
+  suggestion  String?       @db.Text
+  createdAt   DateTime      @default(now())
+
+  analysis DocumentAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@index([analysisId, type])
+  @@index([analysisId, severity])
+}
+
+model CitationCheck {
+  id           String   @id @default(cuid())
+  analysisId   String
+  citationText String
+  sourceType   String?
+  isCorrect    Boolean
+  expected     String?  @db.Text
+  found        String?  @db.Text
+  issues       Json?
+  location     String?
+  createdAt    DateTime @default(now())
+
+  analysis DocumentAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@index([analysisId, isCorrect])
+}
+
+model SubscriptionPlan {
+  id              String        @id @default(cuid())
+  name            String
+  description     String?       @db.Text
+  interval        PlanInterval
+  price           Decimal       @db.Decimal(10, 2)
+  currency        String        @default("TRY")
+  features        Json
+  analysisLimit   Int?
+  maxFileSizeMB   Int           @default(50)
+  concurrentLimit Int           @default(1)
+  isActive        Boolean       @default(true)
+  sortOrder       Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  subscriptions UserSubscription[]
+  invoices      Invoice[]
+  coupons       CouponPlan[]
+
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
+model UserSubscription {
+  id          String             @id @default(cuid())
+  userId      String             @unique
+  planId      String
+  status      SubscriptionStatus @default(TRIAL)
+  startsAt    DateTime           @default(now())
+  expiresAt   DateTime?
+  cancelledAt DateTime?
+  autoRenew   Boolean            @default(true)
+  analysisUsed Int               @default(0)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  user User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([status, expiresAt])
+}
+
+model CreditPackage {
+  id           String  @id @default(cuid())
+  name         String
+  credits      Int
+  price        Decimal @db.Decimal(10, 2)
+  currency     String  @default("TRY")
+  bonusCredits Int     @default(0)
+  isActive     Boolean @default(true)
+  sortOrder    Int     @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  invoices Invoice[]
+  coupons  CouponPackage[]
+
+  @@index([isActive])
+}
+
+model UserCredit {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  balance        Int      @default(0)
+  lifetimeEarned Int      @default(0)
+  lifetimeSpent  Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions CreditTransaction[]
+
+  @@index([userId])
+}
+
+model CreditTransaction {
+  id           String                @id @default(cuid())
+  userCreditId String
+  amount       Int
+  type         CreditTransactionType
+  description  String?
+  referenceId  String?
+  metadata     Json?
+  createdAt    DateTime              @default(now())
+
+  userCredit UserCredit @relation(fields: [userCreditId], references: [id], onDelete: Cascade)
+
+  @@index([userCreditId, createdAt(sort: Desc)])
+  @@index([type, createdAt(sort: Desc)])
+}
+
+model Coupon {
+  id              String           @id @default(cuid())
+  code            String           @unique
+  description     String?          @db.Text
+  discountType    DiscountType
+  discountValue   Decimal?         @db.Decimal(10, 2)
+  maxDiscount     Decimal?         @db.Decimal(10, 2)
+  appliesTo       String[]
+  targetType      CouponTargetType
+  targetUserIds   String[]
+  targetDomains   String[]
+  maxTotalUses    Int?
+  maxUsesPerUser  Int?             @default(1)
+  currentTotalUses Int             @default(0)
+  minCartAmount   Decimal?         @db.Decimal(10, 2)
+  startsAt        DateTime?
+  expiresAt       DateTime?
+  isActive        Boolean          @default(true)
+  createdBy       String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  creator  User?           @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  usages   CouponUsage[]
+  invoices Invoice[]
+  plans    CouponPlan[]
+  packages CouponPackage[]
+
+  @@index([code])
+  @@index([isActive, expiresAt])
+  @@index([createdBy])
+}
+
+model CouponPlan {
+  id       String @id @default(cuid())
+  couponId String
+  planId   String
+
+  coupon Coupon           @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  plan   SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, planId])
+}
+
+model CouponPackage {
+  id        String @id @default(cuid())
+  couponId  String
+  packageId String
+
+  coupon  Coupon        @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  package CreditPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, packageId])
+}
+
+model CouponUsage {
+  id        String   @id @default(cuid())
+  couponId  String
+  userId    String
+  invoiceId String?
+  usedAt    DateTime @default(now())
+
+  coupon  Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@index([couponId])
+  @@index([userId])
+  @@index([couponId, userId])
+}
+
+model Invoice {
+  id                 String        @id @default(cuid())
+  userId             String
+  type               InvoiceType
+  subscriptionPlanId String?
+  creditPackageId    String?
+  couponId           String?
+  discountAmount     Decimal       @default(0) @db.Decimal(10, 2)
+  subtotal           Decimal       @db.Decimal(10, 2)
+  total              Decimal       @db.Decimal(10, 2)
+  taxRate            Decimal       @default(18) @db.Decimal(5, 2)
+  taxAmount          Decimal       @default(0) @db.Decimal(10, 2)
+  currency           String        @default("TRY")
+  status             InvoiceStatus @default(PENDING)
+  invoiceNumber      String?       @unique
+  notes              String?       @db.Text
+  paidAt             DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptionPlan SubscriptionPlan? @relation(fields: [subscriptionPlanId], references: [id], onDelete: SetNull)
+  creditPackage    CreditPackage?   @relation(fields: [creditPackageId], references: [id], onDelete: SetNull)
+  coupon           Coupon?          @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  payments         Payment[]
+  couponUsages     CouponUsage[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([invoiceNumber])
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  userId            String
+  invoiceId         String
+  provider          PaymentProvider
+  providerPaymentId String?
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String        @default("TRY")
+  status            PaymentStatus @default(PENDING)
+  metadata          Json?
+  paidAt            DateTime?
+  createdAt         DateTime      @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([invoiceId])
+  @@index([provider, providerPaymentId])
+}
+
+model SystemConfig {
+  key         String   @id
+  value       Json
+  description String?  @db.Text
+  updatedBy   String?
+  updatedAt   DateTime @updatedAt
+
+  @@index([key])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String?
+  entityId  String?
+  changes   Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@index([entity, entityId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String   @db.Text
+  type      String   @default("info")
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt(sort: Desc)])
+}
