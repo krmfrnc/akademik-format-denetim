@@ -150,7 +150,15 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     let fileUrl: string;
 
-    if (storageType === "s3" || storageType === "vercel_blob") {
+    if (storageType === "vercel_blob") {
+      const { put } = await import("@vercel/blob");
+      const uniqueName = `${user.sub}/${crypto.randomUUID()}.docx`;
+      const blob = await put(uniqueName, buffer, {
+        access: "public",
+        contentType: file.type || validTypes[0],
+      });
+      fileUrl = blob.url;
+    } else if (storageType === "s3") {
       fileUrl = `https://storage.example.com/documents/${user.sub}/${file.name}`;
     } else {
       const fs = await import("fs/promises");
