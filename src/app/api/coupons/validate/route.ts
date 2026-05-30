@@ -2,8 +2,12 @@ import { NextRequest } from "next/server";
 import { validateCoupon } from "@/services/coupon.service";
 import { getAuthUser } from "@/lib/get-auth-user";
 import { AppError, apiSuccess, apiError } from "@/lib/utils";
+import { applyRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest): Promise<Response> {
+  const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+  const limited = applyRateLimit(ip, "coupons:validate", 10);
+  if (limited) return limited;
   try {
     const user = await getAuthUser(request);
     if (!user) {

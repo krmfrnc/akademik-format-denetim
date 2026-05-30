@@ -330,3 +330,118 @@ function parseDurationMs(duration: string): number {
 function parseDurationSeconds(duration: string): number {
   return Math.floor(parseDurationMs(duration) / 1000);
 }
+
+export async function requestEmailVerification(
+  userId: string,
+): Promise<{ token: string }> {
+  const token = crypto.randomUUID();
+
+  await prisma.verificationToken.deleteMany({
+    where: { userId, type: "EMAIL_VERIFY" },
+  });
+
+  await prisma.verificationToken.create({
+    data: {
+      userId,
+      token,
+      type: "EMAIL_VERIFY",
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    },
+  });
+
+  return { token };
+}
+
+export async function verifyEmail(
+  token: string,
+): Promise<boolean> {
+  const record = await prisma.verificationToken.findFirst({
+    where: {
+      token,
+      type: "EMAIL_VERIFY",
+      expiresAt: { gt: new Date() },
+      usedAt: null,
+    },
+  });
+
+  if (!record) return false;
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: record.userId },
+      data: { emailVerified: true },
+    }),
+    prisma.verificationToken.update({
+      where: { id: record.id },
+      data: { usedAt: new Date() },
+    }),
+  ]);
+
+  return true;
+}
+
+export async function requestPasswordReset(
+  email: string,
+): Promise<{ success: true }> {
+  const normalized = email.toLowerCase().trim();
+  const user = await prisma.user.findUnique({ where: { email: normalized } });
+
+  // Kullanıcı bulunamasa da aynı yanıt — e-posta var/yok bilgisi sızdırma
+  if (!user) return { success: true };
+
+  const token = crypto.randomUUID();
+
+  await prisma.verificationToken.deleteMany({
+    where: { userId: user.id, type: "PASSWORD_RESET" },
+  });
+
+  await prisma.verificationToken.create({
+    data: {
+      userId: user.id,
+      token,
+      type: "PASSWORD_RESET",
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    },
+  });
+
+  return { success: true };
+}
+
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<boolean> {
+  if (!newPassword || newPassword.length < 8) {
+    throw new AppError("Şifre en az 8 karakter olmalıdır.", 422, "WEAK_PASSWORD");
+  }
+
+  const record = await prisma.verificationToken.findFirst({
+    where: {
+      token,
+      type: "PASSWORD_RESET",
+      expiresAt: { gt: new Date() },
+      usedAt: null,
+    },
+  });
+
+  if (!record) return false;
+
+  const passwordHash = await hashPassword(newPassword);
+
+  // Tüm refresh token'ları geçersiz kıl
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: record.userId },
+      data: { passwordHash },
+    }),
+    prisma.verificationToken.update({
+      where: { id: record.id },
+      data: { usedAt: new Date() },
+    }),
+    prisma.refreshToken.deleteMany({
+      where: { userId: record.userId },
+    }),
+  ]);
+
+  return true;
+}

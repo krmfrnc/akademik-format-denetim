@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loginUser } from "@/services/auth.service";
 import { AppError, apiError } from "@/lib/utils";
+import { applyRateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest): Promise<Response> {
+  const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+  const limited = applyRateLimit(ip, "auth:login", 5);
+  if (limited) return limited;
   try {
     const body = await request.json();
 
