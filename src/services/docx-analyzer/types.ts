@@ -5,8 +5,10 @@ export interface FormatRules {
   heading1?: SectionRules;
   heading2?: SectionRules;
   heading3?: SectionRules;
+  heading4?: SectionRules;
   abstract?: SectionRules;
   footnote?: SectionRules;
+  blockQuote?: SectionRules;
   bibliography?: BibliographyRules;
   pageNumbers?: PageNumberRules;
   tables?: TableRules;
@@ -26,6 +28,8 @@ export interface SectionRules {
   bold?: boolean;
   italic?: boolean;
   paragraphSpacing?: number;
+  paragraphSpacingBefore?: number;
+  paragraphSpacingAfter?: number;
 }
 
 export interface BibliographyRules extends SectionRules {

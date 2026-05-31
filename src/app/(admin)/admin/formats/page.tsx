@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiGet, apiPost, apiPut, apiDelete } from "@/lib/api-client";
+import { apiGet, apiPost, apiDelete } from "@/lib/api-client";
+import FormatEditor from "@/components/formats/FormatEditor";
+import type { FormatRules } from "@/services/docx-analyzer/types";
 
 interface FormatTemplateItem {
   id: string;
@@ -20,12 +22,6 @@ export default function AdminFormatsPage() {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    isPublic: false,
-  });
-
   const fetchTemplates = useCallback(async () => {
     try {
       setLoading(true);
@@ -35,7 +31,7 @@ export default function AdminFormatsPage() {
         pagination: { total: number };
       }>("/api/formats?limit=100");
       setTemplates(result.data ?? []);
-    } catch (err) {
+    } catch {
       setError("Şablonlar yüklenirken bir hata oluştu.");
     } finally {
       setLoading(false);
@@ -46,13 +42,12 @@ export default function AdminFormatsPage() {
     fetchTemplates();
   }, [fetchTemplates]);
 
-  const handleCreate = async () => {
-    if (!form.name.trim()) return;
+  const handleCreate = async (data: { name: string; description: string; isPublic: boolean; rules: FormatRules }) => {
+    setError(null);
     try {
       setSaving(true);
-      await apiPost("/api/formats", form);
+      await apiPost("/api/formats", data);
       setShowForm(false);
-      setForm({ name: "", description: "", isPublic: false });
       await fetchTemplates();
     } catch {
       setError("Şablon oluşturulurken bir hata oluştu.");
@@ -78,10 +73,10 @@ export default function AdminFormatsPage() {
           Format Şablonları
         </h1>
         <button
-          onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+          onClick={() => { setShowForm(!showForm); setError(null); }}
+          className="btn-primary"
         >
-          + Yeni Şablon
+          {showForm ? "Vazgeç" : "+ Yeni Şablon"}
         </button>
       </div>
 
@@ -92,70 +87,12 @@ export default function AdminFormatsPage() {
       )}
 
       {showForm && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">
-          <h3 className="font-medium text-gray-900 mb-4">
-            Yeni Format Şablonu
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Ad
-              </label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="Şablon adı"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Açıklama
-              </label>
-              <textarea
-                value={form.description}
-                onChange={(e) =>
-                  setForm({ ...form, description: e.target.value })
-                }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                rows={2}
-                placeholder="Opsiyonel açıklama"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="isPublic"
-                checked={form.isPublic}
-                onChange={(e) =>
-                  setForm({ ...form, isPublic: e.target.checked })
-                }
-                className="rounded"
-              />
-              <label
-                htmlFor="isPublic"
-                className="text-sm text-gray-700"
-              >
-                Herkese açık
-              </label>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleCreate}
-                disabled={saving || !form.name.trim()}
-                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {saving ? "Kaydediliyor..." : "Oluştur"}
-              </button>
-              <button
-                onClick={() => setShowForm(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-100"
-              >
-                İptal
-              </button>
-            </div>
-          </div>
+        <div className="mb-8">
+          <FormatEditor
+            onSave={handleCreate}
+            onCancel={() => setShowForm(false)}
+            saving={saving}
+          />
         </div>
       )}
 
@@ -163,7 +100,7 @@ export default function AdminFormatsPage() {
         <div className="text-center py-8 text-gray-500">Yükleniyor...</div>
       )}
 
-      {!loading && templates.length === 0 && (
+      {!loading && !showForm && templates.length === 0 && (
         <div className="text-center py-12 text-gray-400">
           Henüz bir şablon bulunmuyor.
         </div>

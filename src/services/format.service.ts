@@ -71,7 +71,7 @@ export async function createFormat(
       isPublic: isPublic ?? false,
       parentId: parentId ?? null,
       createdBy: userId,
-      rules: rules as Prisma.InputJsonValue,
+      rules: (rules ?? {}) as Prisma.InputJsonValue,
     },
     include: {
       creator: {

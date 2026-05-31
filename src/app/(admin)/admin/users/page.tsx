@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiGet, apiPut } from "@/lib/api-client";
+import { apiGet, apiPost, apiPut } from "@/lib/api-client";
 
 interface UserItem {
   id: string;
@@ -31,6 +31,9 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [updating, setUpdating] = useState<string | null>(null);
+  const [creditModal, setCreditModal] = useState<{ userId: string; email: string } | null>(null);
+  const [creditAmount, setCreditAmount] = useState("");
+  const [grantingCredit, setGrantingCredit] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -63,6 +66,23 @@ export default function AdminUsersPage() {
       setError(err instanceof Error ? err.message : "Güncelleme başarısız.");
     } finally {
       setUpdating(null);
+    }
+  };
+
+  const handleGrantCredits = async () => {
+    if (!creditModal || !creditAmount) return;
+    try {
+      setGrantingCredit(true);
+      await apiPost(`/api/admin/users/${creditModal.userId}/credits`, {
+        amount: parseInt(creditAmount, 10),
+      });
+      setCreditModal(null);
+      setCreditAmount("");
+      await fetchUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kredi verme başarısız.");
+    } finally {
+      setGrantingCredit(false);
     }
   };
 
@@ -150,13 +170,51 @@ export default function AdminUsersPage() {
                   <td className="px-4 py-3 text-xs text-gray-500">
                     {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("tr-TR") : "—"}
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-500">
-                    {new Date(u.createdAt).toLocaleDateString("tr-TR")}
+                  <td className="px-4 py-3 text-xs">
+                    <button
+                      onClick={() => setCreditModal({ userId: u.id, email: u.email })}
+                      className="rounded bg-amber-100 px-2 py-1 text-amber-700 hover:bg-amber-200"
+                    >
+                      Kredi Ver
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {creditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900">Kredi Ver</h2>
+            <p className="mt-1 text-sm text-gray-500">{creditModal.email}</p>
+            <input
+              type="number"
+              value={creditAmount}
+              onChange={(e) => setCreditAmount(e.target.value)}
+              placeholder="Kredi miktarı"
+              min="1"
+              className="input-field mt-4 w-full"
+              onKeyDown={(e) => e.key === "Enter" && handleGrantCredits()}
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => { setCreditModal(null); setCreditAmount(""); }}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleGrantCredits}
+                disabled={grantingCredit || !creditAmount}
+                className="rounded-lg bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                {grantingCredit ? "Veriliyor..." : "Ver"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

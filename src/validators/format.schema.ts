@@ -13,6 +13,8 @@ const spacingRuleSchema = z.object({
   bold: z.boolean().optional(),
   italic: z.boolean().optional(),
   paragraphSpacing: z.number().positive().optional(),
+  paragraphSpacingBefore: z.number().positive().optional(),
+  paragraphSpacingAfter: z.number().positive().optional(),
 });
 
 export const formatRulesSchema = z.object({
@@ -22,6 +24,7 @@ export const formatRulesSchema = z.object({
   heading3: spacingRuleSchema.optional(),
   abstract: spacingRuleSchema.optional(),
   footnote: spacingRuleSchema.optional(),
+  blockQuote: spacingRuleSchema.optional(),
   bibliography: spacingRuleSchema
     .extend({ hangingIndent: z.string().optional() })
     .optional(),
@@ -38,7 +41,7 @@ export const createFormatSchema = z.object({
   description: z.string().max(2000).optional(),
   isPublic: z.boolean().optional().default(false),
   parentId: z.string().optional(),
-  rules: formatRulesSchema,
+  rules: formatRulesSchema.optional(),
 });
 
 export const updateFormatSchema = z.object({

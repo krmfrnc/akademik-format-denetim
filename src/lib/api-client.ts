@@ -5,39 +5,109 @@ function getToken(): string | null {
   return localStorage.getItem("access_token");
 }
 
+function getRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("refresh_token");
+}
+
+function saveTokens(accessToken: string, refreshToken: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem("access_token", accessToken);
+  localStorage.setItem("refresh_token", refreshToken);
+}
+
+function clearAuthAndRedirect(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("auth_user");
+  window.location.href = "/login";
+}
+
+let refreshPromise: Promise<boolean> | null = null;
+
+async function refreshAccessToken(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) return false;
+
+      const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        saveTokens(json.data.accessToken, json.data.refreshToken);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {},
 ): Promise<{ success: boolean; data?: T; error?: { message: string; code: string } }> {
-  const token = getToken();
+  const makeRequest = async (): Promise<{
+    response: Response;
+    json: { success: boolean; data?: T; error?: { message: string; code: string } };
+  }> => {
+    const token = getToken();
 
-  const headers: Record<string, string> = {
-    ...(options.headers as Record<string, string>),
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string>),
+    };
+
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    if (!(options.body instanceof FormData)) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    const response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+    });
+
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return { response, json: { success: true } };
+    }
+
+    const json = await response.json();
+    return { response, json };
   };
 
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
+  const isRefreshRequest = path.includes("/api/auth/refresh");
+  let result = await makeRequest();
 
-  if (!(options.body instanceof FormData)) {
-    headers["Content-Type"] = "application/json";
-  }
-
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
-
-  const contentType = response.headers.get("content-type") || "";
-  if (!contentType.includes("application/json")) {
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  if (!isRefreshRequest && (result.response.status === 401 || result.response.status === 403)) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      result = await makeRequest();
+    } else {
+      clearAuthAndRedirect();
     }
-    return { success: true };
   }
 
-  const json = await response.json();
-  return json;
+  return result.json;
 }
 
 export async function apiGet<T = unknown>(path: string): Promise<T> {
@@ -104,7 +174,16 @@ export async function apiUpload<T = unknown>(
       }
     });
 
-    xhr.addEventListener("load", () => {
+    xhr.addEventListener("load", async () => {
+      if (xhr.status === 401 || xhr.status === 403) {
+        const refreshed = await refreshAccessToken();
+        if (!refreshed) {
+          clearAuthAndRedirect();
+        }
+        reject(new Error("Oturum süresi doldu. Lütfen sayfayı yenileyip tekrar deneyin."));
+        return;
+      }
+
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const json = JSON.parse(xhr.responseText);

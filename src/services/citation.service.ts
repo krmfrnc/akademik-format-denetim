@@ -44,6 +44,57 @@ export async function listCitationStyles(
   return { data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
 }
 
+export async function createCitationStyle(
+  input: {
+    name: string;
+    shortName?: string;
+    description?: string;
+    rules?: unknown;
+    icon?: string;
+    parentId?: string;
+  },
+  userId: string,
+): Promise<CitationStyle> {
+  if (!input.name || input.name.trim().length === 0) {
+    throw new AppError("Stil adı gereklidir.", 422, "VALIDATION_ERROR");
+  }
+
+  if (input.parentId) {
+    const parent = await prisma.citationStyle.findUnique({
+      where: { id: input.parentId },
+    });
+
+    if (!parent) {
+      throw new AppError(
+        "Referans alınan kaynakça stili bulunamadı.",
+        404,
+        "PARENT_NOT_FOUND",
+      );
+    }
+
+    if (!parent.isSystem && parent.createdBy !== userId) {
+      throw new AppError(
+        "Bu kaynakça stili üzerinden türetme yapamazsınız.",
+        403,
+        "FORBIDDEN",
+      );
+    }
+  }
+
+  return prisma.citationStyle.create({
+    data: {
+      name: input.name.trim(),
+      shortName: input.shortName?.trim() ?? null,
+      description: input.description?.trim() ?? null,
+      rules: (input.rules ?? {}) as Prisma.InputJsonValue,
+      icon: input.icon?.trim() ?? null,
+      parentId: input.parentId ?? null,
+      createdBy: userId,
+      isSystem: false,
+    },
+  });
+}
+
 export async function getCitationStyleById(
   id: string,
 ): Promise<CitationStyle | null> {
