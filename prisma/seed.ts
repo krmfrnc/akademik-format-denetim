@@ -333,6 +333,81 @@ async function main() {
   }
 
   console.log("🎉 Tüm atıf stilleri başarıyla eklendi.");
+
+  // ─── Format Şablonları ───
+  console.log("\n🔄 Format şablonları ekleniyor...");
+
+  const formats = [
+    {
+      name: "APA 7 (Uluslararası)",
+      description: "APA 7th Edition formatı. 1 inç kenar boşluğu, Times New Roman 12 pt, çift satır aralığı, asılı girintili kaynakça.",
+      isSystem: true,
+      isPublic: true,
+      rules: {
+        body: { fontFamily: "Times New Roman", fontSize: 12, lineSpacing: 2, alignment: "justify", marginTop: "1in", marginBottom: "1in", marginLeft: "1in", marginRight: "1in", firstLineIndent: "0.5in", paragraphSpacingBefore: 0, paragraphSpacingAfter: 0 },
+        heading1: { fontFamily: "Times New Roman", fontSize: 12, bold: true, alignment: "center", paragraphSpacingBefore: 0, paragraphSpacingAfter: 0 },
+        heading2: { fontFamily: "Times New Roman", fontSize: 12, bold: true, alignment: "left", paragraphSpacingBefore: 0, paragraphSpacingAfter: 0 },
+        heading3: { fontFamily: "Times New Roman", fontSize: 12, bold: true, italic: true, alignment: "left", paragraphSpacingBefore: 0, paragraphSpacingAfter: 0 },
+        abstract: { fontFamily: "Times New Roman", fontSize: 12, lineSpacing: 2 },
+        footnote: { fontFamily: "Times New Roman", fontSize: 10, lineSpacing: 1 },
+        blockQuote: { fontFamily: "Times New Roman", fontSize: 12, lineSpacing: 2, marginLeft: "0.5in" },
+        bibliography: { fontFamily: "Times New Roman", fontSize: 12, lineSpacing: 2, hangingIndent: "0.5in" },
+        pageNumbers: { position: "top-right", fontSize: 12 },
+        tables: { insideBorders: false },
+      },
+    },
+    {
+      name: "YDÜ Sosyal Bilimler Tez",
+      description: "Yakın Doğu Üniversitesi Sosyal Bilimler Enstitüsü Tez Yazım Kılavuzu. Sol 4 cm, diğer 2.5 cm kenar boşluğu. Başlık öncesi/sonrası pt boşlukları tanımlı.",
+      isSystem: true,
+      isPublic: true,
+      rules: {
+        body: { fontFamily: "Times New Roman", fontSize: 12, lineSpacing: 1.5, alignment: "justify", marginTop: "2.5cm", marginBottom: "2.5cm", marginLeft: "4cm", marginRight: "2.5cm", firstLineIndent: "1.25cm", paragraphSpacingBefore: 6, paragraphSpacingAfter: 6 },
+        heading1: { fontFamily: "Times New Roman", fontSize: 12, bold: true, alignment: "left", paragraphSpacingBefore: 72, paragraphSpacingAfter: 18 },
+        heading2: { fontFamily: "Times New Roman", fontSize: 12, bold: true, alignment: "left", paragraphSpacingBefore: 18, paragraphSpacingAfter: 12 },
+        heading3: { fontFamily: "Times New Roman", fontSize: 12, bold: true, alignment: "left", paragraphSpacingBefore: 12, paragraphSpacingAfter: 6 },
+        abstract: { fontFamily: "Times New Roman", fontSize: 12, lineSpacing: 1, alignment: "justify" },
+        footnote: { fontFamily: "Times New Roman", fontSize: 10, lineSpacing: 1 },
+        blockQuote: { fontFamily: "Times New Roman", fontSize: 10, lineSpacing: 1, marginLeft: "1cm", marginRight: "0" },
+        bibliography: { fontFamily: "Times New Roman", fontSize: 12, lineSpacing: 1, hangingIndent: "1.25cm", paragraphSpacingAfter: 12 },
+        pageNumbers: { position: "top-center", fontSize: 12, introRoman: true },
+        tables: { insideBorders: true },
+      },
+    },
+    {
+      name: "UKÜ Tez Formatı",
+      description: "Uluslararası Kıbrıs Üniversitesi Lisansüstü Eğitim Enstitüsü Tez Yazım Kılavuzu. Üst 4 cm, sol 3.5 cm, sağ 3 cm, alt 2.5 cm. Başlıklar 14-12 punto.",
+      isSystem: true,
+      isPublic: true,
+      rules: {
+        body: { fontFamily: "Times New Roman", fontSize: 12, lineSpacing: 1.5, alignment: "justify", marginTop: "4cm", marginBottom: "2.5cm", marginLeft: "3.5cm", marginRight: "3cm" },
+        heading1: { fontFamily: "Times New Roman", fontSize: 14, bold: true, alignment: "left", paragraphSpacingBefore: 18, paragraphSpacingAfter: 12 },
+        heading2: { fontFamily: "Times New Roman", fontSize: 12, bold: true, alignment: "left", paragraphSpacingBefore: 12, paragraphSpacingAfter: 6 },
+        heading3: { fontFamily: "Times New Roman", fontSize: 12, bold: true, alignment: "left", paragraphSpacingBefore: 6, paragraphSpacingAfter: 6 },
+        abstract: { fontFamily: "Times New Roman", fontSize: 12, lineSpacing: 1, alignment: "justify" },
+        footnote: { fontFamily: "Times New Roman", fontSize: 8, lineSpacing: 1 },
+        blockQuote: { fontFamily: "Times New Roman", fontSize: 12, lineSpacing: 1.5 },
+        bibliography: { fontFamily: "Times New Roman", fontSize: 12, lineSpacing: 1.5, paragraphSpacingAfter: 6 },
+        pageNumbers: { position: "bottom-center", fontSize: 11, introRoman: true },
+        tables: { insideBorders: true },
+      },
+    },
+  ];
+
+  for (const fmt of formats) {
+    const existing = await prisma.formatTemplate.findFirst({
+      where: { name: fmt.name, isSystem: true },
+    });
+
+    if (existing) {
+      console.log(`  ⏭️  ${fmt.name} zaten mevcut, atlanıyor.`);
+    } else {
+      await prisma.formatTemplate.create({ data: fmt });
+      console.log(`  ✅ ${fmt.name} eklendi.`);
+    }
+  }
+
+  console.log("🎉 Tüm format şablonları başarıyla eklendi.");
 }
 
 main()
