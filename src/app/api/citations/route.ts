@@ -28,23 +28,27 @@ export async function POST(request: NextRequest): Promise<Response> {
 export async function GET(request: NextRequest): Promise<Response> {
   try {
     const user = await getAuthUser(request);
-    if (!user) {
-      return apiError("Oturum açmanız gerekiyor.", 401, "UNAUTHORIZED");
-    }
 
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") ?? "50", 10) || 1));
 
-    const [data, total] = await Promise.all([
-      prisma.citationStyle.findMany({
-        where: {
+    const where = user
+      ? {
           OR: [
             { isSystem: true },
             { createdBy: user.sub },
             { isActive: true },
           ],
-        },
+        }
+      : {
+          isSystem: true,
+          isActive: true,
+        };
+
+    const [data, total] = await Promise.all([
+      prisma.citationStyle.findMany({
+        where,
         skip: (page - 1) * limit,
         take: limit,
         orderBy: [{ isSystem: "desc" }, { name: "asc" }],
@@ -60,13 +64,7 @@ export async function GET(request: NextRequest): Promise<Response> {
         },
       }),
       prisma.citationStyle.count({
-        where: {
-          OR: [
-            { isSystem: true },
-            { createdBy: user.sub },
-            { isActive: true },
-          ],
-        },
+        where,
       }),
     ]);
 

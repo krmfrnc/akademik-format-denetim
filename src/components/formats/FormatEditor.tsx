@@ -103,8 +103,7 @@ const STEPS = [
   "Özet",
   "Dipnot",
   "Uzun Alıntı",
-  "Kaynakça",
-  "Atıf Stili",
+  "Kaynakça & Atıf",
   "Sayfa Numaraları",
   "Tablolar",
   "Gözden Geçir",
@@ -388,35 +387,45 @@ export default function FormatEditor({ onSave, onCancel, saving, mode = "create"
         {step === 7 && (<div><p className="text-sm text-gray-500 mb-4">Uzun doğrudan alıntı (Block Quote). 3 satırdan uzun alıntılar genelde daha küçük punto, soldan girintili, sıkıştırılmış paragraf.</p>{renderSectionFields("blockQuote")}</div>)}
         {step === 8 && (
           <div>
-            <p className="text-sm text-gray-500 mb-4">Kaynakça (References) bölümü. APA'da asılı girinti kullanılır. Kaynaklar arası 12 pt boşluk yaygındır.</p>
+            <p className="text-sm text-gray-500 mb-4">Kaynakça (References) bölümü formatı ve kullanılacak atıf stili. APA'da asılı girinti kullanılır.</p>
             {(() => {
               const data = form.bibliography as Record<string, unknown>;
               return (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="label-text">Yazı Tipi</label>
-                    <select value={(data.fontFamily as string) ?? ""} onChange={(e) => updateSection("bibliography", "fontFamily", e.target.value || undefined)} className="input-field">
-                      <option value="">Belirtilmedi</option>
-                      {FONT_FAMILIES.map((f) => (<option key={f} value={f}>{f}</option>))}
-                    </select>
+                <div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    <div><label className="label-text">Yazı Tipi</label><select value={(data.fontFamily as string) ?? ""} onChange={(e) => updateSection("bibliography", "fontFamily", e.target.value || undefined)} className="input-field"><option value="">Belirtilmedi</option>{FONT_FAMILIES.map((f) => (<option key={f} value={f}>{f}</option>))}</select></div>
+                    <div><label className="label-text">Yazı Boyutu (pt)</label><select value={(data.fontSize as number) ?? ""} onChange={(e) => updateSection("bibliography", "fontSize", e.target.value ? Number(e.target.value) : undefined)} className="input-field"><option value="">Belirtilmedi</option>{FONT_SIZES.map((s) => (<option key={s} value={s}>{s} pt</option>))}</select></div>
+                    <div><label className="label-text">Satır Aralığı</label><select value={(data.lineSpacing as number) ?? ""} onChange={(e) => updateSection("bibliography", "lineSpacing", e.target.value ? Number(e.target.value) : undefined)} className="input-field"><option value="">Belirtilmedi</option>{LINE_SPACINGS.map((s) => (<option key={s.value} value={s.value}>{s.label}</option>))}</select></div>
+                    <div><label className="label-text">Hizalama</label><select value={(data.alignment as string) ?? ""} onChange={(e) => updateSection("bibliography", "alignment", e.target.value || undefined)} className="input-field"><option value="">Belirtilmedi</option>{ALIGNMENTS.map((a) => (<option key={a.value} value={a.value}>{a.label}</option>))}</select></div>
+                    <div><label className="label-text">Asılı Girinti</label><select value={(data.hangingIndent as string) ?? ""} onChange={(e) => updateSection("bibliography", "hangingIndent", e.target.value || undefined)} className="input-field"><option value="">Belirtilmedi</option>{INDENT_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}</select></div>
+                    <div><label className="label-text">İlk Satır Girintisi</label><select value={(data.firstLineIndent as string) ?? ""} onChange={(e) => updateSection("bibliography", "firstLineIndent", e.target.value || undefined)} className="input-field"><option value="">Belirtilmedi</option>{INDENT_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}</select></div>
+                    <div><label className="label-text">Önce Boşluk</label><select value={(data.paragraphSpacingBefore as number) ?? ""} onChange={(e) => updateSection("bibliography", "paragraphSpacingBefore", e.target.value ? Number(e.target.value) : undefined)} className="input-field"><option value="">Belirtilmedi</option>{PT_SPACING.map((p) => (<option key={p.value} value={p.value}>{p.label}</option>))}</select></div>
+                    <div><label className="label-text">Sonra Boşluk</label><select value={(data.paragraphSpacingAfter as number) ?? ""} onChange={(e) => updateSection("bibliography", "paragraphSpacingAfter", e.target.value ? Number(e.target.value) : undefined)} className="input-field"><option value="">Belirtilmedi</option>{PT_SPACING.map((p) => (<option key={p.value} value={p.value}>{p.label}</option>))}</select></div>
+                    <div className="flex items-center gap-6">
+                      <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={(data.bold as boolean) ?? false} onChange={(e) => updateSection("bibliography", "bold", e.target.checked || undefined)} className="rounded border-gray-300" /><span className="text-sm font-medium text-gray-700">Kalın</span></label>
+                      <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={(data.italic as boolean) ?? false} onChange={(e) => updateSection("bibliography", "italic", e.target.checked || undefined)} className="rounded border-gray-300" /><span className="text-sm font-medium text-gray-700">İtalik</span></label>
+                    </div>
                   </div>
-                  <div><label className="label-text">Yazı Boyutu (pt)</label><select value={(data.fontSize as number) ?? ""} onChange={(e) => updateSection("bibliography", "fontSize", e.target.value ? Number(e.target.value) : undefined)} className="input-field"><option value="">Belirtilmedi</option>{FONT_SIZES.map((s) => (<option key={s} value={s}>{s} pt</option>))}</select></div>
-                  <div><label className="label-text">Satır Aralığı</label><select value={(data.lineSpacing as number) ?? ""} onChange={(e) => updateSection("bibliography", "lineSpacing", e.target.value ? Number(e.target.value) : undefined)} className="input-field"><option value="">Belirtilmedi</option>{LINE_SPACINGS.map((s) => (<option key={s.value} value={s.value}>{s.label}</option>))}</select></div>
-                  <div><label className="label-text">Hizalama</label><select value={(data.alignment as string) ?? ""} onChange={(e) => updateSection("bibliography", "alignment", e.target.value || undefined)} className="input-field"><option value="">Belirtilmedi</option>{ALIGNMENTS.map((a) => (<option key={a.value} value={a.value}>{a.label}</option>))}</select></div>
-                  <div><label className="label-text">Asılı Girinti</label><select value={(data.hangingIndent as string) ?? ""} onChange={(e) => updateSection("bibliography", "hangingIndent", e.target.value || undefined)} className="input-field"><option value="">Belirtilmedi</option>{INDENT_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}</select></div>
-                  <div><label className="label-text">İlk Satır Girintisi</label><select value={(data.firstLineIndent as string) ?? ""} onChange={(e) => updateSection("bibliography", "firstLineIndent", e.target.value || undefined)} className="input-field"><option value="">Belirtilmedi</option>{INDENT_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}</select></div>
-                  <div><label className="label-text">Önce Boşluk</label><select value={(data.paragraphSpacingBefore as number) ?? ""} onChange={(e) => updateSection("bibliography", "paragraphSpacingBefore", e.target.value ? Number(e.target.value) : undefined)} className="input-field"><option value="">Belirtilmedi</option>{PT_SPACING.map((p) => (<option key={p.value} value={p.value}>{p.label}</option>))}</select></div>
-                  <div><label className="label-text">Sonra Boşluk</label><select value={(data.paragraphSpacingAfter as number) ?? ""} onChange={(e) => updateSection("bibliography", "paragraphSpacingAfter", e.target.value ? Number(e.target.value) : undefined)} className="input-field"><option value="">Belirtilmedi</option>{PT_SPACING.map((p) => (<option key={p.value} value={p.value}>{p.label}</option>))}</select></div>
-                  <div className="flex items-center gap-6">
-                    <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={(data.bold as boolean) ?? false} onChange={(e) => updateSection("bibliography", "bold", e.target.checked || undefined)} className="rounded border-gray-300" /><span className="text-sm font-medium text-gray-700">Kalın</span></label>
-                    <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={(data.italic as boolean) ?? false} onChange={(e) => updateSection("bibliography", "italic", e.target.checked || undefined)} className="rounded border-gray-300" /><span className="text-sm font-medium text-gray-700">İtalik</span></label>
+
+                  <div className="border-t border-gray-200 pt-4">
+                    <label className="label-text">Atıf Stili (metin içi ve kaynakça formatı)</label>
+                    <p className="text-xs text-gray-400 mb-2">Bu şablonda kullanılacak atıf stilini seçin. Boş bırakılırsa belge analizi sırasında ayrıca seçilir.</p>
+                    <select value={form.citationStyleId} onChange={(e) => setForm({ ...form, citationStyleId: e.target.value })} className="input-field max-w-lg">
+                      <option value="">Seçilmedi</option>
+                      {citationStyles?.map((cs) => (
+                        <option key={cs.id} value={cs.id}>{cs.icon ? `${cs.icon} ` : ""}{cs.name}{cs.shortName ? ` (${cs.shortName})` : ""}</option>
+                      ))}
+                    </select>
+                    {form.citationStyleId && (
+                      <p className="text-xs text-indigo-600 mt-1">Seçili: {citationStyles?.find((cs) => cs.id === form.citationStyleId)?.name}</p>
+                    )}
                   </div>
                 </div>
               );
             })()}
           </div>
         )}
-        {step === 10 && (
+        {step === 9 && (
           <div>
             <p className="text-sm text-gray-500 mb-4">Sayfa numaralandırma. Tezlerde: ön sayfalar Romen (i, ii, iii), ana metin Arap (1, 2, 3).</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
@@ -427,8 +436,8 @@ export default function FormatEditor({ onSave, onCancel, saving, mode = "create"
             </div>
           </div>
         )}
-        {step === 11 && (<div><p className="text-sm text-gray-500 mb-4">Tablolar için format kuralları.</p><div className="max-w-lg"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={form.tables.insideBorders ?? false} onChange={(e) => setForm({ ...form, tables: { insideBorders: e.target.checked || undefined } })} className="rounded border-gray-300" /><span className="text-sm text-gray-700">Tablo içi kenar çizgileri (APA'da sadece yatay çizgiler)</span></label></div></div>)}
-        {step === 12 && (
+        {step === 10 && (<div><p className="text-sm text-gray-500 mb-4">Tablolar için format kuralları.</p><div className="max-w-lg"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={form.tables.insideBorders ?? false} onChange={(e) => setForm({ ...form, tables: { insideBorders: e.target.checked || undefined } })} className="rounded border-gray-300" /><span className="text-sm text-gray-700">Tablo içi kenar çizgileri (APA'da sadece yatay çizgiler)</span></label></div></div>)}
+        {step === 11 && (
           <div>
             <p className="text-sm text-gray-500 mb-4">Oluşturulacak şablonun özetini kontrol edin.</p>
             <div className="bg-gray-50 rounded-lg p-4 space-y-2 max-h-96 overflow-y-auto">
