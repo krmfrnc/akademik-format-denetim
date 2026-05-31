@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -337,6 +337,9 @@ async function main() {
   // ─── Format Şablonları ───
   console.log("\n🔄 Format şablonları ekleniyor...");
 
+  const apa7Citation = await prisma.citationStyle.findFirst({ where: { shortName: "apa7" } });
+  const apa7trCitation = await prisma.citationStyle.findFirst({ where: { shortName: "apa7-tr" } });
+
   const formats = [
     {
       name: "APA 7 (Uluslararası)",
@@ -354,6 +357,7 @@ async function main() {
         bibliography: { fontFamily: "Times New Roman", fontSize: 12, lineSpacing: 2, hangingIndent: "0.5in" },
         pageNumbers: { position: "top-right", fontSize: 12 },
         tables: { insideBorders: false },
+        citationStyleId: apa7Citation?.id,
       },
     },
     {
@@ -372,6 +376,7 @@ async function main() {
         bibliography: { fontFamily: "Times New Roman", fontSize: 12, lineSpacing: 1, hangingIndent: "1.25cm", paragraphSpacingAfter: 12 },
         pageNumbers: { position: "top-center", fontSize: 12, introRoman: true },
         tables: { insideBorders: true },
+        citationStyleId: apa7trCitation?.id,
       },
     },
     {
@@ -390,6 +395,7 @@ async function main() {
         bibliography: { fontFamily: "Times New Roman", fontSize: 12, lineSpacing: 1.5, paragraphSpacingAfter: 6 },
         pageNumbers: { position: "bottom-center", fontSize: 11, introRoman: true },
         tables: { insideBorders: true },
+        citationStyleId: apa7trCitation?.id,
       },
     },
   ];
@@ -400,7 +406,12 @@ async function main() {
     });
 
     if (existing) {
-      console.log(`  ⏭️  ${fmt.name} zaten mevcut, atlanıyor.`);
+      // Update existing to ensure citationStyleId is set
+      await prisma.formatTemplate.update({
+        where: { id: existing.id },
+        data: { rules: fmt.rules as Prisma.InputJsonValue },
+      });
+      console.log(`  🔄 ${fmt.name} güncellendi (citationStyleId eklendi).`);
     } else {
       await prisma.formatTemplate.create({ data: fmt });
       console.log(`  ✅ ${fmt.name} eklendi.`);

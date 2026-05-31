@@ -28,6 +28,8 @@ export default function AdminFormatsPage() {
     name?: string; description?: string; isPublic?: boolean; rules?: FormatRules;
   } | undefined>();
 
+  const [citationStyles, setCitationStyles] = useState<{ id: string; name: string; shortName: string | null; icon: string | null }[]>([]);
+
   const fetchTemplates = useCallback(async () => {
     try {
       setLoading(true);
@@ -39,6 +41,12 @@ export default function AdminFormatsPage() {
   }, []);
 
   useEffect(() => { fetchTemplates(); }, [fetchTemplates]);
+
+  useEffect(() => {
+    apiGet<{ data: { id: string; name: string; shortName: string | null; icon: string | null }[] }>("/api/citations?limit=100")
+      .then((res) => setCitationStyles(res.data ?? []))
+      .catch(() => {});
+  }, []);
 
   const handleCreate = async (data: { name: string; description: string; isPublic: boolean; rules: FormatRules }) => {
     setError(null);
@@ -113,6 +121,7 @@ export default function AdminFormatsPage() {
             saving={saving}
             mode={editMode}
             initialData={initialData}
+            citationStyles={citationStyles}
           />
         </div>
       )}

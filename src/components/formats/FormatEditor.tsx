@@ -14,6 +14,7 @@ interface FormatEditorProps {
     isPublic?: boolean;
     rules?: FormatRules;
   };
+  citationStyles?: { id: string; name: string; shortName: string | null; icon: string | null }[];
 }
 
 const FONT_FAMILIES = [
@@ -103,6 +104,7 @@ const STEPS = [
   "Dipnot",
   "Uzun Alıntı",
   "Kaynakça",
+  "Atıf Stili",
   "Sayfa Numaraları",
   "Tablolar",
   "Gözden Geçir",
@@ -121,6 +123,7 @@ interface FormState {
   body: SectionForm; heading1: SectionForm; heading2: SectionForm; heading3: SectionForm;
   abstract: SectionForm; footnote: SectionForm; blockQuote: SectionForm;
   bibliography: BibForm;
+  citationStyleId: string;
   pageNumbers: { position?: string; fontSize?: number; format?: string; introRoman?: boolean };
   tables: { insideBorders?: boolean };
 }
@@ -138,7 +141,7 @@ function rulesToForm(rules?: FormatRules): Partial<FormState> {
   return f as Partial<FormState>;
 }
 
-export default function FormatEditor({ onSave, onCancel, saving, mode = "create", initialData }: FormatEditorProps) {
+export default function FormatEditor({ onSave, onCancel, saving, mode = "create", initialData, citationStyles }: FormatEditorProps) {
   const [step, setStep] = useState(0);
 
   const [form, setForm] = useState<FormState>({
@@ -148,6 +151,7 @@ export default function FormatEditor({ onSave, onCancel, saving, mode = "create"
     abstract: { ...emptySection }, footnote: { ...emptySection },
     blockQuote: { ...emptySection },
     bibliography: { ...emptySection },
+    citationStyleId: "",
     pageNumbers: {}, tables: {},
   });
 
@@ -165,6 +169,7 @@ export default function FormatEditor({ onSave, onCancel, saving, mode = "create"
         footnote: { ...emptySection, ...(initialData.rules?.footnote ?? {}) },
         blockQuote: { ...emptySection, ...(initialData.rules?.blockQuote ?? {}) },
         bibliography: { ...emptySection, ...(initialData.rules?.bibliography ?? {}) },
+        citationStyleId: (initialData.rules as Record<string, unknown>)?.citationStyleId as string ?? "",
         pageNumbers: { ...(initialData.rules?.pageNumbers ?? {}) },
         tables: { ...(initialData.rules?.tables ?? {}) },
       });
@@ -189,6 +194,7 @@ export default function FormatEditor({ onSave, onCancel, saving, mode = "create"
       }
       if (Object.keys(cleaned).length > 0) (r as Record<string, unknown>)[s] = cleaned;
     }
+    if (form.citationStyleId) (r as Record<string, unknown>).citationStyleId = form.citationStyleId;
     return r;
   };
 
@@ -410,7 +416,7 @@ export default function FormatEditor({ onSave, onCancel, saving, mode = "create"
             })()}
           </div>
         )}
-        {step === 9 && (
+        {step === 10 && (
           <div>
             <p className="text-sm text-gray-500 mb-4">Sayfa numaralandırma. Tezlerde: ön sayfalar Romen (i, ii, iii), ana metin Arap (1, 2, 3).</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
@@ -421,8 +427,8 @@ export default function FormatEditor({ onSave, onCancel, saving, mode = "create"
             </div>
           </div>
         )}
-        {step === 10 && (<div><p className="text-sm text-gray-500 mb-4">Tablolar için format kuralları.</p><div className="max-w-lg"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={form.tables.insideBorders ?? false} onChange={(e) => setForm({ ...form, tables: { insideBorders: e.target.checked || undefined } })} className="rounded border-gray-300" /><span className="text-sm text-gray-700">Tablo içi kenar çizgileri (APA'da sadece yatay çizgiler)</span></label></div></div>)}
-        {step === 11 && (
+        {step === 11 && (<div><p className="text-sm text-gray-500 mb-4">Tablolar için format kuralları.</p><div className="max-w-lg"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={form.tables.insideBorders ?? false} onChange={(e) => setForm({ ...form, tables: { insideBorders: e.target.checked || undefined } })} className="rounded border-gray-300" /><span className="text-sm text-gray-700">Tablo içi kenar çizgileri (APA'da sadece yatay çizgiler)</span></label></div></div>)}
+        {step === 12 && (
           <div>
             <p className="text-sm text-gray-500 mb-4">Oluşturulacak şablonun özetini kontrol edin.</p>
             <div className="bg-gray-50 rounded-lg p-4 space-y-2 max-h-96 overflow-y-auto">
@@ -431,6 +437,12 @@ export default function FormatEditor({ onSave, onCancel, saving, mode = "create"
                 <span className="text-gray-500 font-medium">Açıklama:</span><span className="text-gray-900">{form.description || "-"}</span>
                 <span className="text-gray-500 font-medium">Herkese Açık:</span><span className="text-gray-900">{form.isPublic ? "Evet" : "Hayır"}</span>
               </div>
+              {form.citationStyleId && (
+                <div className="border-t border-gray-200 pt-2 mt-2">
+                  <span className="text-xs font-semibold text-gray-500">Atıf Stili</span>
+                  <div className="text-xs text-gray-700 mt-1">{citationStyles?.find((cs) => cs.id === form.citationStyleId)?.name ?? form.citationStyleId}</div>
+                </div>
+              )}
               {Object.keys(reviewSectionLabel).map((s) => renderReviewSection(s as keyof typeof reviewSectionLabel))}
               {(form.pageNumbers.position || form.pageNumbers.fontSize || form.pageNumbers.format) && (
                 <div className="border-t border-gray-200 pt-2 mt-2">
