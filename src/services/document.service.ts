@@ -466,6 +466,46 @@ function calculateFormatScore(violations: Violation[]): number {
   return Math.max(0, Math.round(100 - penalty));
 }
 
+export async function deleteDocument(
+  documentId: string,
+  userId: string,
+): Promise<void> {
+  const document = await prisma.document.findFirst({
+    where: { id: documentId, userId },
+  });
+
+  if (!document) {
+    throw new AppError("Belge bulunamadı.", 404, "DOCUMENT_NOT_FOUND");
+  }
+
+  const fileUrl = document.fileUrl;
+
+  if (fileUrl.includes("blob.vercel-storage.com")) {
+    const { del } = await import("@vercel/blob");
+    try {
+      await del(fileUrl, { token: process.env.BLOB_READ_WRITE_TOKEN });
+    } catch (err) {
+      console.error("Vercel Blob deletion failed:", err);
+    }
+  } else if (fileUrl.startsWith("/api/documents/file/")) {
+    const storageConfig = await prisma.systemConfig.findUnique({
+      where: { key: "storage.local_path" },
+    });
+    const storagePath = (storageConfig?.value as string) ?? "/uploads/documents";
+    const relativePath = fileUrl.replace("/api/documents/file/", "");
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const absolutePath = path.join(process.cwd(), storagePath, relativePath);
+    try {
+      await fs.unlink(absolutePath);
+    } catch (err) {
+      console.error("Local file deletion failed:", err);
+    }
+  }
+
+  await prisma.document.delete({ where: { id: documentId } });
+}
+
 function calculateCitationScore(results: CitationCheckResult[]): number {
   if (results.length === 0) return 100;
 

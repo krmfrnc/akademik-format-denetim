@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/get-auth-user";
 import { apiSuccess, apiError, AppError } from "@/lib/utils";
+import { deleteDocument } from "@/services/document.service";
 
 export async function GET(
   request: NextRequest,
@@ -82,5 +83,27 @@ export async function GET(
     }
     console.error("GET /api/documents/[id] error:", error);
     return apiError("Belge bilgileri alınırken bir hata oluştu.", 500);
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+): Promise<Response> {
+  try {
+    const user = await getAuthUser(request);
+    if (!user) {
+      return apiError("Oturum açmanız gerekiyor.", 401, "UNAUTHORIZED");
+    }
+
+    await deleteDocument(params.id, user.sub);
+
+    return apiSuccess({ message: "Belge silindi." });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return apiError(error.message, error.statusCode, error.code);
+    }
+    console.error("DELETE /api/documents/[id] error:", error);
+    return apiError("Belge silinirken bir hata oluştu.", 500);
   }
 }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { apiGet, apiPost } from "@/lib/api-client";
+import { apiGet, apiPost, apiDelete } from "@/lib/api-client";
 import ViolationWizard from "@/components/documents/ViolationWizard";
 
 interface Violation {
@@ -104,6 +104,7 @@ export default function DocumentDetailPage({
   const [activeTab, setActiveTab] = useState<"violations" | "citations">("violations");
   const [violationFilter, setViolationFilter] = useState<string>("all");
   const [analyzing, setAnalyzing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [viewMode, setViewMode] = useState<"wizard" | "list">(initialWizard ? "wizard" : "list");
 
   const fetchDocument = useCallback(async () => {
@@ -156,6 +157,22 @@ export default function DocumentDetailPage({
 
   const handleRestoreAll = () => {
     setDismissedIds(new Set());
+  };
+
+  const handleDeleteDocument = async () => {
+    if (!document) return;
+    if (!window.confirm(`"${document.originalName}" belgesini kalıcı olarak silmek istediğinize emin misiniz?`)) {
+      return;
+    }
+    try {
+      setDeleting(true);
+      setError(null);
+      await apiDelete(`/api/documents/${document.id}`);
+      router.push("/documents");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Belge silinirken bir hata oluştu.");
+      setDeleting(false);
+    }
   };
 
   const getScoreColor = (score: number): string => {
@@ -237,6 +254,13 @@ export default function DocumentDetailPage({
               {analyzing ? "Analiz Başlatılıyor..." : "Analiz Et"}
             </button>
           )}
+          <button
+            onClick={handleDeleteDocument}
+            disabled={deleting}
+            className="btn-danger text-sm"
+          >
+            {deleting ? "Siliniyor..." : "Belgeyi Sil"}
+          </button>
         </div>
       </div>
 
