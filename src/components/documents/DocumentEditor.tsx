@@ -208,11 +208,11 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
     const fetchHtml = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`/api/documents/${documentId}/html`);
+        const res = await fetch(`/api/documents/${documentId}?includeHtml=true`);
         const json = await res.json();
         if (json.success) {
-          setHtmlContent(json.data.html);
-          setViolations(json.data.violations || []);
+          setHtmlContent(json.data.html || "");
+          setViolations(json.data.analysis?.violations || []);
         } else {
           setError(json.error?.message || "Belge içeriği yüklenemedi.");
         }
