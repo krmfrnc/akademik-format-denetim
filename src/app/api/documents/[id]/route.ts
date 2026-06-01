@@ -4,7 +4,44 @@ import { getAuthUser } from "@/lib/get-auth-user";
 import { apiSuccess, apiError, AppError } from "@/lib/utils";
 import { deleteDocument } from "@/services/document.service";
 import { parseDocxBuffer } from "@/services/docx-analyzer";
-import { parsedDocxToHtml } from "@/services/docx-to-html";
+import type { DocxParagraph, DocxRun, ParsedDocx } from "@/services/docx-analyzer/types";
+import { classifyParagraphSection } from "@/services/docx-analyzer/docx-parser";
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function runToHtml(run: DocxRun): string {
+  const styles: string[] = [];
+  if (run.fontFamily) styles.push(`font-family:${run.fontFamily}`);
+  if (run.fontSize) styles.push(`font-size:${run.fontSize}pt`);
+  const styleAttr = styles.length > 0 ? ` style="${styles.join(";")}"` : "";
+  const text = escapeHtml(run.text);
+  if (!text.trim()) return text;
+  let inner = text;
+  if (run.bold) inner = `<strong>${inner}</strong>`;
+  if (run.italic) inner = `<em>${inner}</em>`;
+  if (run.underline) inner = `<u>${inner}</u>`;
+  return styleAttr ? `<span${styleAttr}>${inner}</span>` : `<span>${inner}</span>`;
+}
+
+const ALIGN: Record<string, string> = { left: "left", right: "right", center: "center", both: "justify", justify: "justify" };
+
+function paragraphToHtml(para: DocxParagraph): string {
+  const section = classifyParagraphSection(para);
+  const styles: string[] = [];
+  if (para.alignment) styles.push(`text-align:${ALIGN[para.alignment] || para.alignment}`);
+  if (para.lineSpacing) styles.push(`line-height:${para.lineSpacing}`);
+  if (para.firstLineIndent) styles.push(`text-indent:${para.firstLineIndent / 20}pt`);
+  const styleAttr = styles.length > 0 ? ` style="${styles.join(";")}"` : "";
+  const runsHtml = para.runs.length > 0 ? para.runs.map(runToHtml).join("") : escapeHtml(para.text);
+  if (!runsHtml.trim()) return `<p data-para-index="${para.index}" data-section="${section}"${styleAttr}><br></p>`;
+  return `<p data-para-index="${para.index}" data-section="${section}"${styleAttr}>${runsHtml}</p>`;
+}
+
+function parsedDocxToHtml(parsed: ParsedDocx): string {
+  return parsed.paragraphs.map(paragraphToHtml).join("\n");
+}
 
 async function getDocumentHtml(fileUrl: string): Promise<string | null> {
   try {
@@ -24,7 +61,8 @@ async function getDocumentHtml(fileUrl: string): Promise<string | null> {
       const absolutePath = `${process.cwd()}/${storagePath}/${relativePath}`;
       const fs = await import("fs/promises");
       const buffer = await fs.readFile(absolutePath);
-      const parsed = await parseDocxBuffer(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
+      const ab = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+      const parsed = await parseDocxBuffer(ab);
       return parsedDocxToHtml(parsed);
     }
     return null;
