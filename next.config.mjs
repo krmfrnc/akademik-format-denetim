@@ -2,6 +2,9 @@
 const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ["bcryptjs", "jose"],
+    serverActions: {
+      bodySizeLimit: "100mb",
+    },
   },
 };
 

@@ -195,6 +195,12 @@ export async function apiUpload<T = unknown>(
         } catch {
           reject(new Error("Sunucu yanıtı işlenemedi"));
         }
+      } else if (xhr.status === 413) {
+        reject(new Error(
+          "Dosya boyutu sunucu limitini aşıyor (HTTP 413). " +
+          "Lütfen dosyayı küçültün veya yöneticinizle iletişime geçin. " +
+          "Maksimum dosya boyutu: ücretsiz kullanıcılar için 10 MB, aboneler için 50 MB."
+        ));
       } else {
         try {
           const json = JSON.parse(xhr.responseText);
