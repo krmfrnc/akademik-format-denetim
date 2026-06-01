@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { apiGet, apiPost, apiDelete } from "@/lib/api-client";
-import DocumentEditor from "@/components/documents/DocumentEditor";
-import ViolationSidebar from "@/components/documents/ViolationSidebar";
+
+const DocumentEditor = dynamic(() => import("@/components/documents/DocumentEditor"), { ssr: false });
+const ViolationSidebar = dynamic(() => import("@/components/documents/ViolationSidebar"), { ssr: false });
 
 interface ViolationData {
   id: string;
