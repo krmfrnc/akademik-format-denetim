@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useState, useMemo } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { apiGet, apiPost } from "@/lib/api-client";
+import ViolationWizard from "@/components/documents/ViolationWizard";
 
 interface Violation {
   id: string;
@@ -88,7 +89,9 @@ const violationTypeLabels: Record<string, string> = {
 export default function DocumentDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const documentId = params.id as string;
+  const initialWizard = searchParams.get("wizard") === "1";
 
   const [document, setDocument] = useState<DocumentDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,6 +100,7 @@ export default function DocumentDetailPage() {
   const [activeTab, setActiveTab] = useState<"violations" | "citations">("violations");
   const [violationFilter, setViolationFilter] = useState<string>("all");
   const [analyzing, setAnalyzing] = useState(false);
+  const [viewMode, setViewMode] = useState<"wizard" | "list">(initialWizard ? "wizard" : "list");
 
   const fetchDocument = useCallback(async () => {
     try {
@@ -146,16 +150,14 @@ export default function DocumentDetailPage() {
     });
   };
 
+  const handleRestoreAll = () => {
+    setDismissedIds(new Set());
+  };
+
   const getScoreColor = (score: number): string => {
     if (score >= 80) return "text-green-600";
     if (score >= 50) return "text-amber-600";
     return "text-red-600";
-  };
-
-  const getScoreBg = (score: number): string => {
-    if (score >= 80) return "bg-green-500";
-    if (score >= 50) return "bg-amber-500";
-    return "bg-red-500";
   };
 
   if (loading) {
@@ -193,9 +195,12 @@ export default function DocumentDetailPage() {
   const violations = analysis?.violations ?? [];
   const citationResults = analysis?.citationResults ?? [];
 
-  const visibleViolations = violations
-    .filter((v) => !dismissedIds.has(v.id))
-    .filter((v) => violationFilter === "all" || v.severity === violationFilter.toUpperCase());
+  const visibleViolations = useMemo(
+    () => violations
+      .filter((v) => !dismissedIds.has(v.id))
+      .filter((v) => violationFilter === "all" || v.severity === violationFilter.toUpperCase()),
+    [violations, dismissedIds, violationFilter],
+  );
 
   const progress = violations.length > 0
     ? Math.round(((violations.length - dismissedIds.size) / violations.length) * 100)
@@ -354,205 +359,251 @@ export default function DocumentDetailPage() {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
             <div className="flex gap-2">
               <button
-                onClick={() => setActiveTab("violations")}
+                onClick={() => { setViewMode("wizard"); setActiveTab("violations"); }}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                  activeTab === "violations"
+                  viewMode === "wizard"
                     ? "bg-indigo-600 text-white"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
-                Format İhlalleri ({visibleViolations.length})
+                Adım Adım Düzelt
               </button>
               <button
-                onClick={() => setActiveTab("citations")}
+                onClick={() => setViewMode("list")}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                  activeTab === "citations"
+                  viewMode === "list"
                     ? "bg-indigo-600 text-white"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
-                Kaynakça Kontrolleri ({citationResults.length})
+                Tümünü Listele
               </button>
             </div>
 
-            {activeTab === "violations" && violations.length > 0 && (
-              <select
-                value={violationFilter}
-                onChange={(e) => setViolationFilter(e.target.value)}
-                className="input-field w-auto"
-              >
-                <option value="all">Tümü</option>
-                <option value="error">Hatalar</option>
-                <option value="warning">Uyarılar</option>
-                <option value="info">Bilgiler</option>
-              </select>
+            {viewMode === "list" && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setActiveTab("violations")}
+                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                    activeTab === "violations"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  Format İhlalleri ({visibleViolations.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab("citations")}
+                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                    activeTab === "citations"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  Kaynakça Kontrolleri ({citationResults.length})
+                </button>
+              </div>
             )}
           </div>
 
-          {activeTab === "violations" && (
-            <div className="space-y-3">
-              {visibleViolations.length === 0 ? (
-                <div className="py-12 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-                    <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <p className="mt-3 text-sm font-medium text-gray-900">
-                    {violations.length === 0
-                      ? "Tebrikler! Hiçbir format ihlali bulunamadı."
-                      : "Tüm ihlaller gözardı edildi."}
-                  </p>
-                </div>
-              ) : (
-                visibleViolations.map((v) => {
-                  const sev = severityStyles[v.severity] || severityStyles.INFO;
-                  return (
-                    <div
-                      key={v.id}
-                      className={`rounded-lg border-l-4 bg-white p-4 shadow-sm transition-opacity ${sev.border} ${dismissedIds.has(v.id) ? "opacity-50" : ""}`}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${sev.bg} ${sev.text}`}>
-                              {v.severity === "ERROR" ? "Hata" : v.severity === "WARNING" ? "Uyarı" : "Bilgi"}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {violationTypeLabels[v.type] || v.type}
-                            </span>
-                            {v.section && (
-                              <span className="text-xs text-gray-400">
-                                · {v.section}
-                              </span>
-                            )}
-                            {v.location && (
-                              <span className="text-xs text-gray-400">
-                                · {v.location}
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-2 text-sm text-gray-700">{v.description}</p>
-                          <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
-                            <div className="rounded bg-red-50 px-3 py-2">
-                              <span className="font-medium text-red-700">Bulunan:</span>{" "}
-                              <span className="text-red-600">{v.found}</span>
-                            </div>
-                            <div className="rounded bg-green-50 px-3 py-2">
-                              <span className="font-medium text-green-700">Beklenen:</span>{" "}
-                              <span className="text-green-600">{v.expected}</span>
-                            </div>
-                          </div>
-                          {v.suggestion && (
-                            <p className="mt-2 text-sm text-indigo-600">
-                              <span className="font-medium">Öneri:</span> {v.suggestion}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => handleDismiss(v.id)}
-                          className={`flex-shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                            dismissedIds.has(v.id)
-                              ? "bg-gray-100 text-gray-400"
-                              : "bg-amber-50 text-amber-700 hover:bg-amber-100"
-                          }`}
-                          disabled={dismissedIds.has(v.id)}
-                        >
-                          {dismissedIds.has(v.id) ? "Gözardı Edildi" : "Gözardı Et"}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
+          {viewMode === "wizard" && activeTab === "violations" ? (
+            <ViolationWizard
+              violations={violations}
+              dismissedIds={dismissedIds}
+              onDismiss={handleDismiss}
+              onRestoreAll={handleRestoreAll}
+              onViewAll={() => setViewMode("list")}
+            />
+          ) : viewMode === "wizard" && activeTab === "citations" ? (
+            <div className="text-center py-8 text-gray-500">
+              Kaynakça kontrolleri liste görünümünde incelenebilir.
+              <button onClick={() => setViewMode("list")} className="btn-primary ml-3 text-sm">
+                Listeye Geç
+              </button>
             </div>
-          )}
-
-          {activeTab === "citations" && (
-            <div className="space-y-3">
-              {citationResults.length === 0 ? (
-                <div className="py-12 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
-                    <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-                    </svg>
+          ) : (
+            <div>
+              {activeTab === "violations" && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    {violations.length > 0 && (
+                      <select
+                        value={violationFilter}
+                        onChange={(e) => setViolationFilter(e.target.value)}
+                        className="input-field w-auto"
+                      >
+                        <option value="all">Tümü</option>
+                        <option value="error">Hatalar</option>
+                        <option value="warning">Uyarılar</option>
+                        <option value="info">Bilgiler</option>
+                      </select>
+                    )}
                   </div>
-                  <p className="mt-3 text-sm text-gray-500">
-                    Kaynakça doğrulaması için bir atıf stili seçerek analiz başlatın.
-                  </p>
-                </div>
-              ) : (
-                citationResults.map((c) => (
-                  <div
-                    key={c.id}
-                    className={`rounded-lg border bg-white p-4 shadow-sm ${
-                      c.isCorrect ? "border-green-200" : "border-red-200"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                              c.isCorrect
-                                ? "bg-green-100 text-green-700"
-                                : "bg-red-100 text-red-700"
-                            }`}
-                          >
-                            {c.isCorrect ? "Doğru" : "Hatalı"}
-                          </span>
-                          {c.sourceType && (
-                            <span className="text-xs text-gray-500">{c.sourceType}</span>
-                          )}
-                          {c.location && (
-                            <span className="truncate text-xs text-gray-400">{c.location}</span>
-                          )}
-                        </div>
 
-                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                          {!c.isCorrect && c.found && (
-                            <div className="rounded bg-red-50 p-3">
-                              <p className="text-xs font-medium text-red-700 mb-1">Sizin Yazdığınız</p>
-                              <p className="text-sm text-red-600 break-words">{c.found}</p>
-                            </div>
-                          )}
-                          {!c.isCorrect && c.expected && (
-                            <div className="rounded bg-green-50 p-3">
-                              <p className="text-xs font-medium text-green-700 mb-1">Crossref Doğru Format</p>
-                              <p className="text-sm text-green-600 break-words"
-                                dangerouslySetInnerHTML={{ __html: c.expected }}
-                              />
-                            </div>
-                          )}
-                          {c.isCorrect && (
-                            <div className="rounded bg-green-50 p-3 sm:col-span-2">
-                              <p className="text-sm text-green-700 break-words">{c.citationText}</p>
-                            </div>
-                          )}
-                        </div>
-
-                        {c.issues && typeof c.issues === "object" && Object.keys(c.issues).length > 0 && (
-                          <div className="mt-3 border-t border-gray-100 pt-3">
-                            <p className="text-xs font-medium text-gray-700 mb-2">Tespit Edilen Sorunlar:</p>
-                            <ul className="space-y-1">
-                              {Object.entries(c.issues).map(([key, value]) => {
-                                if (value && typeof value === "object" && "message" in value) {
-                                  return (
-                                    <li key={key} className="text-xs text-gray-600">
-                                      <span className="font-medium">{key}:</span>{" "}
-                                      {String((value as Record<string, string>).message)}
-                                    </li>
-                                  );
-                                }
-                                return null;
-                              })}
-                            </ul>
-                          </div>
-                        )}
+                  {visibleViolations.length === 0 ? (
+                    <div className="py-12 text-center">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+                        <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
                       </div>
+                      <p className="mt-3 text-sm font-medium text-gray-900">
+                        {violations.length === 0
+                          ? "Tebrikler! Hiçbir format ihlali bulunamadı."
+                          : "Tüm ihlaller gözardı edildi."}
+                      </p>
                     </div>
-                  </div>
-                ))
+                  ) : (
+                    visibleViolations.map((v) => {
+                      const sev = severityStyles[v.severity] || severityStyles.INFO;
+                      return (
+                        <div
+                          key={v.id}
+                          className={`rounded-lg border-l-4 bg-white p-4 shadow-sm transition-opacity ${sev.border} ${dismissedIds.has(v.id) ? "opacity-50" : ""}`}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${sev.bg} ${sev.text}`}>
+                                  {v.severity === "ERROR" ? "Hata" : v.severity === "WARNING" ? "Uyarı" : "Bilgi"}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {violationTypeLabels[v.type] || v.type}
+                                </span>
+                                {v.section && (
+                                  <span className="text-xs text-gray-400">
+                                    · {v.section}
+                                  </span>
+                                )}
+                                {v.location && (
+                                  <span className="text-xs text-gray-400">
+                                    · {v.location}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="mt-2 text-sm text-gray-700">{v.description}</p>
+                              <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+                                <div className="rounded bg-red-50 px-3 py-2">
+                                  <span className="font-medium text-red-700">Bulunan:</span>{" "}
+                                  <span className="text-red-600">{v.found}</span>
+                                </div>
+                                <div className="rounded bg-green-50 px-3 py-2">
+                                  <span className="font-medium text-green-700">Beklenen:</span>{" "}
+                                  <span className="text-green-600">{v.expected}</span>
+                                </div>
+                              </div>
+                              {v.suggestion && (
+                                <p className="mt-2 text-sm text-indigo-600">
+                                  <span className="font-medium">Öneri:</span> {v.suggestion}
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => handleDismiss(v.id)}
+                              className={`flex-shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                                dismissedIds.has(v.id)
+                                  ? "bg-gray-100 text-gray-400"
+                                  : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                              }`}
+                              disabled={dismissedIds.has(v.id)}
+                            >
+                              {dismissedIds.has(v.id) ? "Gözardı Edildi" : "Gözardı Et"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+
+              {activeTab === "citations" && (
+                <div className="space-y-3">
+                  {citationResults.length === 0 ? (
+                    <div className="py-12 text-center">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
+                        <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                        </svg>
+                      </div>
+                      <p className="mt-3 text-sm text-gray-500">
+                        Kaynakça doğrulaması için bir atıf stili seçerek analiz başlatın.
+                      </p>
+                    </div>
+                  ) : (
+                    citationResults.map((c) => (
+                      <div
+                        key={c.id}
+                        className={`rounded-lg border bg-white p-4 shadow-sm ${
+                          c.isCorrect ? "border-green-200" : "border-red-200"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                  c.isCorrect
+                                    ? "bg-green-100 text-green-700"
+                                    : "bg-red-100 text-red-700"
+                                }`}
+                              >
+                                {c.isCorrect ? "Doğru" : "Hatalı"}
+                              </span>
+                              {c.sourceType && (
+                                <span className="text-xs text-gray-500">{c.sourceType}</span>
+                              )}
+                              {c.location && (
+                                <span className="truncate text-xs text-gray-400">{c.location}</span>
+                              )}
+                            </div>
+
+                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                              {!c.isCorrect && c.found && (
+                                <div className="rounded bg-red-50 p-3">
+                                  <p className="text-xs font-medium text-red-700 mb-1">Sizin Yazdığınız</p>
+                                  <p className="text-sm text-red-600 break-words">{c.found}</p>
+                                </div>
+                              )}
+                              {!c.isCorrect && c.expected && (
+                                <div className="rounded bg-green-50 p-3">
+                                  <p className="text-xs font-medium text-green-700 mb-1">Crossref Doğru Format</p>
+                                  <p className="text-sm text-green-600 break-words"
+                                    dangerouslySetInnerHTML={{ __html: c.expected }}
+                                  />
+                                </div>
+                              )}
+                              {c.isCorrect && (
+                                <div className="rounded bg-green-50 p-3 sm:col-span-2">
+                                  <p className="text-sm text-green-700 break-words">{c.citationText}</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {c.issues && typeof c.issues === "object" && Object.keys(c.issues).length > 0 && (
+                              <div className="mt-3 border-t border-gray-100 pt-3">
+                                <p className="text-xs font-medium text-gray-700 mb-2">Tespit Edilen Sorunlar:</p>
+                                <ul className="space-y-1">
+                                  {Object.entries(c.issues).map(([key, value]) => {
+                                    if (value && typeof value === "object" && "message" in value) {
+                                      return (
+                                        <li key={key} className="text-xs text-gray-600">
+                                          <span className="font-medium">{key}:</span>{" "}
+                                          {String((value as Record<string, string>).message)}
+                                        </li>
+                                      );
+                                    }
+                                    return null;
+                                  })}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               )}
             </div>
           )}

@@ -2,20 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import FileUploadZone from "@/components/documents/FileUploadZone";
-import { apiGet, apiUpload, apiPost } from "@/lib/api-client";
-
-interface FormatTemplate {
-  id: string;
-  name: string;
-  isSystem: boolean;
-}
-
-interface CitationStyle {
-  id: string;
-  name: string;
-  isSystem: boolean;
-}
+import { useRouter } from "next/navigation";
+import DocumentUploadWizard from "@/components/documents/DocumentUploadWizard";
+import { apiGet } from "@/lib/api-client";
 
 interface DocumentItem {
   id: string;
@@ -41,13 +30,6 @@ interface PaginatedDocs {
   pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
-interface CouponValidation {
-  valid: boolean;
-  coupon: { id: string; code: string; discountType: string; discountValue: number | null };
-  discount: { originalAmount: number; discountAmount: number; finalAmount: number; formula: string };
-  message: string;
-}
-
 const statusLabels: Record<string, { label: string; className: string }> = {
   UPLOADED: { label: "Yüklendi", className: "bg-blue-100 text-blue-700" },
   PROCESSING: { label: "Analiz Ediliyor", className: "bg-amber-100 text-amber-700" },
@@ -56,27 +38,12 @@ const statusLabels: Record<string, { label: string; className: string }> = {
 };
 
 export default function DocumentsPage() {
+  const router = useRouter();
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [formats, setFormats] = useState<FormatTemplate[]>([]);
-  const [styles, setStyles] = useState<CitationStyle[]>([]);
-
   const [showUpload, setShowUpload] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedFormat, setSelectedFormat] = useState<string>("");
-  const [selectedStyle, setSelectedStyle] = useState<string>("");
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
-
-  const [couponCode, setCouponCode] = useState("");
-  const [couponResult, setCouponResult] = useState<CouponValidation | null>(null);
-  const [couponLoading, setCouponLoading] = useState(false);
-  const [couponError, setCouponError] = useState<string | null>(null);
 
   const fetchDocuments = useCallback(async () => {
     try {
@@ -94,94 +61,14 @@ export default function DocumentsPage() {
     }
   }, [pagination.page, pagination.limit]);
 
-  const fetchTemplates = useCallback(async () => {
-    try {
-      const [formatResult, styleResult] = await Promise.all([
-        apiGet<{ data: FormatTemplate[] }>("/api/formats?limit=100"),
-        apiGet<{ data: CitationStyle[] }>("/api/citations?limit=100").catch(() => null),
-      ]);
-      setFormats(formatResult.data || []);
-      if (styleResult) {
-        setStyles((styleResult as unknown as { data: CitationStyle[] }).data || []);
-      }
-    } catch {
-      // Şablonlar yüklenemezse ana işlemi bloke etme
-    }
-  }, []);
-
   useEffect(() => {
     fetchDocuments();
-    fetchTemplates();
-  }, [fetchDocuments, fetchTemplates]);
+  }, [fetchDocuments]);
 
-  const handleFileSelected = useCallback((file: File) => {
-    setSelectedFile(file);
-    setUploadError(null);
-    setUploadSuccess(false);
-  }, []);
-
-  const handleUpload = async () => {
-    if (!selectedFile) return;
-
-    try {
-      setUploading(true);
-      setUploadError(null);
-      setUploadProgress(0);
-
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-
-      const uploadedDoc = await apiUpload<{ id: string; originalName: string }>(
-        "/api/documents",
-        formData,
-        (percent) => setUploadProgress(percent),
-      );
-
-      if (selectedFormat || selectedStyle) {
-        try {
-          await apiPost(`/api/documents/${uploadedDoc.id}/analyze`, {
-            formatTemplateId: selectedFormat || null,
-            citationStyleId: selectedStyle || null,
-          });
-        } catch {
-          // Analiz başlatma başarısız olsa bile belge yüklendi
-        }
-      }
-
-      setUploadSuccess(true);
-      setSelectedFile(null);
-      setSelectedFormat("");
-      setSelectedStyle("");
-      setCouponCode("");
-      setCouponResult(null);
-      setShowUpload(false);
-
-      await fetchDocuments();
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Yükleme sırasında bir hata oluştu.");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleValidateCoupon = async () => {
-    if (!couponCode.trim()) return;
-
-    try {
-      setCouponLoading(true);
-      setCouponError(null);
-      const result = await apiPost<CouponValidation>("/api/coupons/validate", {
-        code: couponCode.trim(),
-        cartType: "SUBSCRIPTION",
-        cartAmount: 0,
-      });
-      setCouponResult(result);
-    } catch (err) {
-      setCouponError(err instanceof Error ? err.message : "Kupon doğrulanamadı.");
-      setCouponResult(null);
-    } finally {
-      setCouponLoading(false);
-    }
+  const handleUploadComplete = (documentId: string) => {
+    setShowUpload(false);
+    fetchDocuments();
+    router.push(`/documents/${documentId}?wizard=1`);
   };
 
   const formatDate = (dateStr: string): string => {
@@ -225,143 +112,10 @@ export default function DocumentsPage() {
       </div>
 
       {showUpload && (
-        <div className="card space-y-6">
-          <h2 className="text-lg font-semibold text-gray-900">Belge Yükle</h2>
-
-          <FileUploadZone
-            onFileSelected={handleFileSelected}
-            disabled={uploading}
-            uploadProgress={uploadProgress}
-            isUploading={uploading}
-            onRemove={() => {
-              setSelectedFile(null);
-              setUploadError(null);
-              setUploadProgress(0);
-            }}
-          />
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="label-text">Format Şablonu (isteğe bağlı)</label>
-              <select
-                value={selectedFormat}
-                onChange={(e) => setSelectedFormat(e.target.value)}
-                className="input-field"
-                disabled={uploading}
-              >
-                <option value="">Seçiniz...</option>
-                {formats.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name} {f.isSystem ? "(Sistem)" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="label-text">Kaynakça Stili (isteğe bağlı)</label>
-              <select
-                value={selectedStyle}
-                onChange={(e) => setSelectedStyle(e.target.value)}
-                className="input-field"
-                disabled={uploading}
-              >
-                <option value="">Seçiniz...</option>
-                {styles.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} {s.isSystem ? "(Sistem)" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-200 pt-4">
-            <label className="label-text">Kupon Kodu</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value)}
-                placeholder="Kupon kodunuz varsa giriniz..."
-                className="input-field flex-1"
-                disabled={uploading || couponLoading}
-              />
-              <button
-                onClick={handleValidateCoupon}
-                disabled={!couponCode.trim() || couponLoading}
-                className="btn-secondary"
-              >
-                {couponLoading ? "Kontrol ediliyor..." : "Uygula"}
-              </button>
-            </div>
-
-            {couponError && (
-              <p className="mt-2 text-sm text-red-600">{couponError}</p>
-            )}
-
-            {couponResult?.valid && (
-              <div className="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
-                <p className="text-sm font-medium text-green-800">
-                  {couponResult.message}
-                </p>
-                {couponResult.discount.discountAmount > 0 && (
-                  <p className="mt-1 text-sm text-green-700">
-                    İndirim: {couponResult.discount.formula}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {uploadError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              {uploadError}
-            </div>
-          )}
-
-          {uploadSuccess && (
-            <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
-              Belge başarıyla yüklendi!
-            </div>
-          )}
-
-          {uploading && (
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-xs text-gray-600">
-                <span>Yükleniyor...</span>
-                <span>{uploadProgress}%</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-gray-200">
-                <div
-                  className="h-full rounded-full bg-indigo-600 transition-all duration-300 ease-out"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={() => {
-                setShowUpload(false);
-                setSelectedFile(null);
-                setUploadError(null);
-              }}
-              className="btn-secondary"
-              disabled={uploading}
-            >
-              İptal
-            </button>
-            <button
-              onClick={handleUpload}
-              disabled={!selectedFile || uploading}
-              className="btn-primary"
-            >
-              {uploading ? "Yükleniyor..." : "Yükle"}
-            </button>
-          </div>
-        </div>
+        <DocumentUploadWizard
+          onComplete={handleUploadComplete}
+          onCancel={() => setShowUpload(false)}
+        />
       )}
 
       {error && (
@@ -432,14 +186,14 @@ export default function DocumentsPage() {
 
                   {doc.status === "ANALYZED" && (
                     <Link
-                      href={`/documents/${doc.id}`}
+                      href={`/documents/${doc.id}?wizard=1`}
                       className="btn-primary text-xs"
                     >
                       Sonuçları İncele
                     </Link>
                   )}
 
-                  {doc.status === "UPLOADED" && formats.length > 0 && (
+                  {doc.status === "UPLOADED" && (
                     <Link
                       href={`/documents/${doc.id}`}
                       className="btn-secondary text-xs"
