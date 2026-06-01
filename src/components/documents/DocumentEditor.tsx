@@ -27,7 +27,22 @@ interface ViolationData {
 }
 
 interface DocumentEditorProps {
-  documentId: string;
+  violations: ViolationData[];
+  onDismissedChange?: (ids: Set<string>) => void;
+}
+
+function generatePlaceholderHtml(violations: ViolationData[]): string {
+  const maxPara = violations.reduce((max, v) => {
+    const idx = parseParagraphIndex(v.location);
+    return idx !== null && idx > max ? idx : max;
+  }, 0);
+  const parts: string[] = [];
+  for (let i = 0; i <= maxPara; i++) {
+    const v = violations.find((x) => parseParagraphIndex(x.location) === i);
+    const loc = v ? v.location : `Paragraf ${i + 1}`;
+    parts.push(`<p data-para-index="${i}">${loc}</p>`);
+  }
+  return parts.join("\n");
 }
 
 function parseParagraphIndex(location: string | null): number | null {
@@ -126,14 +141,23 @@ function selectParagraphByIndex(editor: Editor, paraIdx: number): { from: number
   return result;
 }
 
-export default function DocumentEditor({ documentId }: DocumentEditorProps) {
+export default function DocumentEditor({ violations: initialViolations, onDismissedChange }: DocumentEditorProps) {
   const [htmlContent, setHtmlContent] = useState<string>("");
   const [violations, setViolations] = useState<ViolationData[]>([]);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [activeViolation, setActiveViolation] = useState<ViolationData | null>(null);
   const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setViolations(initialViolations);
+    setHtmlContent(generatePlaceholderHtml(initialViolations));
+  }, [initialViolations]);
+
+  useEffect(() => {
+    onDismissedChange?.(dismissedIds);
+  }, [dismissedIds, onDismissedChange]);
 
   const violationsRef = useRef<ViolationData[]>([]);
   const dismissedIdsRef = useRef<Set<string>>(new Set());
@@ -203,27 +227,6 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
       editor.view.dispatch(editor.state.tr.setMeta("violationUpdate", Date.now()));
     }
   }, [violations, dismissedIds, editor]);
-
-  useEffect(() => {
-    const fetchHtml = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/documents/${documentId}?includeHtml=true`);
-        const json = await res.json();
-        if (json.success) {
-          setHtmlContent(json.data.html || "");
-          setViolations(json.data.analysis?.violations || []);
-        } else {
-          setError(json.error?.message || "Belge içeriği yüklenemedi.");
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Belge içeriği yüklenirken hata oluştu.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchHtml();
-  }, [documentId]);
 
   const handleLeave = useCallback(
     (violationId: string) => {
