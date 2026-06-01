@@ -157,7 +157,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       const { put } = await import("@vercel/blob");
       const uniqueName = `${user.sub}/${crypto.randomUUID()}.docx`;
       const blob = await put(uniqueName, buffer, {
-        access: "public",
+        access: "private",
         contentType: file.type || validTypes[0],
       });
       fileUrl = blob.url;

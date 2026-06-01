@@ -179,7 +179,26 @@ async function runDocumentAnalysis(
   }
 
   try {
-    const response = await fetch(document.fileUrl);
+    const fileUrl = document.fileUrl;
+    const isVercelBlob = fileUrl.includes("blob.vercel-storage.com");
+
+    let fetchUrl = fileUrl;
+    let fetchHeaders: Record<string, string> | undefined;
+
+    if (isVercelBlob) {
+      const token = process.env.BLOB_READ_WRITE_TOKEN;
+      if (token) {
+        fetchUrl = fileUrl.includes("?")
+          ? `${fileUrl}&token=${token}`
+          : `${fileUrl}?token=${token}`;
+      } else {
+        fetchHeaders = {
+          Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN || ""}`,
+        };
+      }
+    }
+
+    const response = await fetch(fetchUrl, fetchHeaders ? { headers: fetchHeaders } : undefined);
     if (!response.ok) {
       throw new AppError(
         "Belge dosyasına erişilemedi.",

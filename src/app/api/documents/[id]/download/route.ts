@@ -36,7 +36,19 @@ export async function GET(
 
     const formatTemplate = document.analyses[0]?.formatTemplate;
 
-    const response = await fetch(document.fileUrl);
+    const isVercelBlob = document.fileUrl.includes("blob.vercel-storage.com");
+
+    let fetchUrl = document.fileUrl;
+    if (isVercelBlob) {
+      const token = process.env.BLOB_READ_WRITE_TOKEN;
+      if (token) {
+        fetchUrl = document.fileUrl.includes("?")
+          ? `${document.fileUrl}&token=${token}`
+          : `${document.fileUrl}?token=${token}`;
+      }
+    }
+
+    const response = await fetch(fetchUrl);
     if (!response.ok) {
       return apiError("Belge dosyasına erişilemedi.", 500, "FILE_FETCH_ERROR");
     }
