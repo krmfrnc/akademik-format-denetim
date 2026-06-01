@@ -155,7 +155,7 @@ function parseStyles(parsedStyles: unknown): Map<string, StyleDefinition> {
 
   try {
     const styleEntries = ensureArray<Record<string, unknown>>(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       (parsedStyles as any)?.styles?.style,
     );
 
@@ -199,7 +199,7 @@ function parseParagraphs(
   parsedDocument: unknown,
   styles: Map<string, StyleDefinition>,
 ): DocxParagraph[] {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line
   const body = (parsedDocument as any)?.document?.body as Record<string, unknown>;
   if (!body) return [];
 
@@ -328,7 +328,7 @@ function parseRuns(pEl: Record<string, unknown>): DocxRun[] {
 }
 
 function parseSections(parsedDocument: unknown): DocxSection[] {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line
   const body = (parsedDocument as any)?.document?.body as Record<string, unknown>;
   if (!body) return [];
 
@@ -369,7 +369,7 @@ function parseSections(parsedDocument: unknown): DocxSection[] {
 }
 
 function parseTables(parsedDocument: unknown): DocxTable[] {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line
   const body = (parsedDocument as any)?.document?.body as Record<string, unknown>;
   if (!body) return [];
 
