@@ -164,6 +164,20 @@ export default function DocumentDetailPage({
     return "text-red-600";
   };
 
+  const violations: Violation[] = document?.analysis?.violations ?? [];
+  const citationResults: CitationCheckItem[] = document?.analysis?.citationResults ?? [];
+
+  const visibleViolations = useMemo(
+    () => violations
+      .filter((v) => !dismissedIds.has(v.id))
+      .filter((v) => violationFilter === "all" || v.severity === violationFilter.toUpperCase()),
+    [violations, dismissedIds, violationFilter],
+  );
+
+  const progress = violations.length > 0
+    ? Math.round(((violations.length - dismissedIds.size) / violations.length) * 100)
+    : 0;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -196,19 +210,6 @@ export default function DocumentDetailPage({
 
   const analysis = document.analysis;
   const summary = analysis?.summary as AnalysisSummary | null;
-  const violations = analysis?.violations ?? [];
-  const citationResults = analysis?.citationResults ?? [];
-
-  const visibleViolations = useMemo(
-    () => violations
-      .filter((v) => !dismissedIds.has(v.id))
-      .filter((v) => violationFilter === "all" || v.severity === violationFilter.toUpperCase()),
-    [violations, dismissedIds, violationFilter],
-  );
-
-  const progress = violations.length > 0
-    ? Math.round(((violations.length - dismissedIds.size) / violations.length) * 100)
-    : 0;
 
   return (
     <div className="space-y-6">
