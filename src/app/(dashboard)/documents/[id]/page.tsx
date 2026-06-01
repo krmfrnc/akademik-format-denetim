@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiGet, apiPost, apiDelete } from "@/lib/api-client";
-import ViolationWizard from "@/components/documents/ViolationWizard";
+import DocumentEditor from "@/components/documents/DocumentEditor";
+import ViolationSidebar from "@/components/documents/ViolationSidebar";
 
-interface Violation {
+interface ViolationData {
   id: string;
   type: string;
   severity: "ERROR" | "WARNING" | "INFO";
@@ -55,7 +56,7 @@ interface DocumentDetail {
     summary: AnalysisSummary | null;
     formatTemplate: { id: string; name: string } | null;
     citationStyle: { id: string; name: string } | null;
-    violations: Violation[];
+    violations: ViolationData[];
     citationResults: CitationCheckItem[];
   } | null;
 }
@@ -86,16 +87,10 @@ const violationTypeLabels: Record<string, string> = {
   OTHER: "Diğer",
 };
 
-export default function DocumentDetailPage({
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams: { [key: string]: string | string[] | undefined };
-}) {
+export default function DocumentDetailPage() {
   const router = useRouter();
   const params = useParams();
   const documentId = params.id as string;
-  const initialWizard = searchParams.wizard === "1";
 
   const [document, setDocument] = useState<DocumentDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,7 +100,9 @@ export default function DocumentDetailPage({
   const [violationFilter, setViolationFilter] = useState<string>("all");
   const [analyzing, setAnalyzing] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [viewMode, setViewMode] = useState<"wizard" | "list">(initialWizard ? "wizard" : "list");
+  const [viewMode, setViewMode] = useState<"editor" | "list">("editor");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeSidebarViolationId, setActiveSidebarViolationId] = useState<string | null>(null);
 
   const fetchDocument = useCallback(async () => {
     try {
@@ -175,14 +172,29 @@ export default function DocumentDetailPage({
     }
   };
 
+  const handleSidebarViolationClick = (violation: ViolationData) => {
+    setActiveSidebarViolationId(violation.id);
+    if (viewMode !== "editor") setViewMode("editor");
+    setTimeout(() => {
+      const el = window.document.querySelector(`[data-violation-id="${violation.id}"]`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 150);
+  };
+
   const getScoreColor = (score: number): string => {
     if (score >= 80) return "text-green-600";
     if (score >= 50) return "text-amber-600";
     return "text-red-600";
   };
 
-  const violations: Violation[] = document?.analysis?.violations ?? [];
-  const citationResults: CitationCheckItem[] = document?.analysis?.citationResults ?? [];
+  const violations = useMemo(
+    () => document?.analysis?.violations ?? [],
+    [document?.analysis?.violations],
+  );
+  const citationResults = useMemo(
+    () => document?.analysis?.citationResults ?? [],
+    [document?.analysis?.citationResults],
+  );
 
   const visibleViolations = useMemo(
     () => violations
@@ -229,7 +241,7 @@ export default function DocumentDetailPage({
   const summary = analysis?.summary as AnalysisSummary | null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <button
@@ -252,6 +264,14 @@ export default function DocumentDetailPage({
           {(!analysis || analysis.status === "UPLOADED" || analysis.status === "FAILED") && (
             <button onClick={handleAnalyze} disabled={analyzing} className="btn-primary">
               {analyzing ? "Analiz Başlatılıyor..." : "Analiz Et"}
+            </button>
+          )}
+          {analysis && (
+            <button
+              onClick={() => router.push(`/api/documents/${documentId}/download`)}
+              className="btn-secondary text-sm"
+            >
+              İndir
             </button>
           )}
           <button
@@ -284,12 +304,7 @@ export default function DocumentDetailPage({
             <div className="text-center">
               <div className="relative mx-auto h-24 w-24">
                 <svg className="h-24 w-24 -rotate-90" viewBox="0 0 100 100">
-                  <circle
-                    cx="50" cy="50" r="40"
-                    fill="none"
-                    stroke="#e5e7eb"
-                    strokeWidth="10"
-                  />
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" strokeWidth="10" />
                   <circle
                     cx="50" cy="50" r="40"
                     fill="none"
@@ -384,255 +399,252 @@ export default function DocumentDetailPage({
       )}
 
       {analysis && (
+        <div className="flex items-center justify-between">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setViewMode("editor")}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                viewMode === "editor"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              Editör
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                viewMode === "list"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              Tümünü Listele
+            </button>
+          </div>
+
+          <div className="flex gap-2 items-center">
+            {dismissedIds.size > 0 && (
+              <button onClick={handleRestoreAll} className="text-xs text-gray-500 hover:text-gray-700">
+                Tümünü geri yükle
+              </button>
+            )}
+            {viewMode === "editor" && (
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors"
+              >
+                {sidebarOpen ? "Sidebar'ı Gizle" : "Sidebar'ı Göster"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {analysis && viewMode === "editor" && (
+        <div className="flex gap-4">
+          {sidebarOpen && (
+            <div className="w-64 flex-shrink-0 rounded-lg border border-gray-200 bg-white">
+              <ViolationSidebar
+                violations={violations}
+                dismissedIds={dismissedIds}
+                onViolationClick={handleSidebarViolationClick}
+                activeViolationId={activeSidebarViolationId}
+              />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <DocumentEditor documentId={documentId} />
+          </div>
+        </div>
+      )}
+
+      {viewMode === "list" && (
         <div className="card">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
             <div className="flex gap-2">
               <button
-                onClick={() => { setViewMode("wizard"); setActiveTab("violations"); }}
+                onClick={() => setActiveTab("violations")}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                  viewMode === "wizard"
+                  activeTab === "violations"
                     ? "bg-indigo-600 text-white"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
-                Adım Adım Düzelt
+                Format İhlalleri ({visibleViolations.length})
               </button>
               <button
-                onClick={() => setViewMode("list")}
+                onClick={() => setActiveTab("citations")}
                 className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                  viewMode === "list"
+                  activeTab === "citations"
                     ? "bg-indigo-600 text-white"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
-                Tümünü Listele
+                Kaynakça Kontrolleri ({citationResults.length})
               </button>
             </div>
-
-            {viewMode === "list" && (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setActiveTab("violations")}
-                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                    activeTab === "violations"
-                      ? "bg-indigo-600 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  Format İhlalleri ({visibleViolations.length})
-                </button>
-                <button
-                  onClick={() => setActiveTab("citations")}
-                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                    activeTab === "citations"
-                      ? "bg-indigo-600 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  Kaynakça Kontrolleri ({citationResults.length})
-                </button>
-              </div>
-            )}
           </div>
 
-          {viewMode === "wizard" && activeTab === "violations" ? (
-            <ViolationWizard
-              violations={violations}
-              dismissedIds={dismissedIds}
-              onDismiss={handleDismiss}
-              onRestoreAll={handleRestoreAll}
-              onViewAll={() => setViewMode("list")}
-            />
-          ) : viewMode === "wizard" && activeTab === "citations" ? (
-            <div className="text-center py-8 text-gray-500">
-              Kaynakça kontrolleri liste görünümünde incelenebilir.
-              <button onClick={() => setViewMode("list")} className="btn-primary ml-3 text-sm">
-                Listeye Geç
-              </button>
-            </div>
-          ) : (
-            <div>
-              {activeTab === "violations" && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    {violations.length > 0 && (
-                      <select
-                        value={violationFilter}
-                        onChange={(e) => setViolationFilter(e.target.value)}
-                        className="input-field w-auto"
-                      >
-                        <option value="all">Tümü</option>
-                        <option value="error">Hatalar</option>
-                        <option value="warning">Uyarılar</option>
-                        <option value="info">Bilgiler</option>
-                      </select>
-                    )}
+          {activeTab === "violations" && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                {violations.length > 0 && (
+                  <select
+                    value={violationFilter}
+                    onChange={(e) => setViolationFilter(e.target.value)}
+                    className="input-field w-auto"
+                  >
+                    <option value="all">Tümü</option>
+                    <option value="error">Hatalar</option>
+                    <option value="warning">Uyarılar</option>
+                    <option value="info">Bilgiler</option>
+                  </select>
+                )}
+              </div>
+
+              {visibleViolations.length === 0 ? (
+                <div className="py-12 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+                    <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                   </div>
-
-                  {visibleViolations.length === 0 ? (
-                    <div className="py-12 text-center">
-                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-                        <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </div>
-                      <p className="mt-3 text-sm font-medium text-gray-900">
-                        {violations.length === 0
-                          ? "Tebrikler! Hiçbir format ihlali bulunamadı."
-                          : "Tüm ihlaller gözardı edildi."}
-                      </p>
-                    </div>
-                  ) : (
-                    visibleViolations.map((v) => {
-                      const sev = severityStyles[v.severity] || severityStyles.INFO;
-                      return (
-                        <div
-                          key={v.id}
-                          className={`rounded-lg border-l-4 bg-white p-4 shadow-sm transition-opacity ${sev.border} ${dismissedIds.has(v.id) ? "opacity-50" : ""}`}
+                  <p className="mt-3 text-sm font-medium text-gray-900">
+                    {violations.length === 0 ? "Tebrikler! Hiçbir format ihlali bulunamadı." : "Tüm ihlaller gözardı edildi."}
+                  </p>
+                </div>
+              ) : (
+                visibleViolations.map((v) => {
+                  const sev = severityStyles[v.severity] || severityStyles.INFO;
+                  return (
+                    <div
+                      key={v.id}
+                      className={`rounded-lg border-l-4 bg-white p-4 shadow-sm ${sev.border} ${dismissedIds.has(v.id) ? "opacity-50" : ""}`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${sev.bg} ${sev.text}`}>
+                              {v.severity === "ERROR" ? "Hata" : v.severity === "WARNING" ? "Uyarı" : "Bilgi"}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {violationTypeLabels[v.type] || v.type}
+                            </span>
+                            {v.section && <span className="text-xs text-gray-400">· {v.section}</span>}
+                            {v.location && <span className="text-xs text-gray-400">· {v.location}</span>}
+                          </div>
+                          <p className="mt-2 text-sm text-gray-700">{v.description}</p>
+                          <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
+                            <div className="rounded bg-red-50 px-3 py-2">
+                              <span className="font-medium text-red-700">Bulunan:</span>{" "}
+                              <span className="text-red-600">{v.found}</span>
+                            </div>
+                            <div className="rounded bg-green-50 px-3 py-2">
+                              <span className="font-medium text-green-700">Beklenen:</span>{" "}
+                              <span className="text-green-600">{v.expected}</span>
+                            </div>
+                          </div>
+                          {v.suggestion && (
+                            <p className="mt-2 text-sm text-indigo-600">
+                              <span className="font-medium">Öneri:</span> {v.suggestion}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleDismiss(v.id)}
+                          className={`flex-shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                            dismissedIds.has(v.id)
+                              ? "bg-gray-100 text-gray-400"
+                              : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                          }`}
+                          disabled={dismissedIds.has(v.id)}
                         >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${sev.bg} ${sev.text}`}>
-                                  {v.severity === "ERROR" ? "Hata" : v.severity === "WARNING" ? "Uyarı" : "Bilgi"}
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  {violationTypeLabels[v.type] || v.type}
-                                </span>
-                                {v.section && (
-                                  <span className="text-xs text-gray-400">
-                                    · {v.section}
-                                  </span>
-                                )}
-                                {v.location && (
-                                  <span className="text-xs text-gray-400">
-                                    · {v.location}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="mt-2 text-sm text-gray-700">{v.description}</p>
-                              <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
-                                <div className="rounded bg-red-50 px-3 py-2">
-                                  <span className="font-medium text-red-700">Bulunan:</span>{" "}
-                                  <span className="text-red-600">{v.found}</span>
-                                </div>
-                                <div className="rounded bg-green-50 px-3 py-2">
-                                  <span className="font-medium text-green-700">Beklenen:</span>{" "}
-                                  <span className="text-green-600">{v.expected}</span>
-                                </div>
-                              </div>
-                              {v.suggestion && (
-                                <p className="mt-2 text-sm text-indigo-600">
-                                  <span className="font-medium">Öneri:</span> {v.suggestion}
-                                </p>
-                              )}
-                            </div>
-                            <button
-                              onClick={() => handleDismiss(v.id)}
-                              className={`flex-shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                                dismissedIds.has(v.id)
-                                  ? "bg-gray-100 text-gray-400"
-                                  : "bg-amber-50 text-amber-700 hover:bg-amber-100"
-                              }`}
-                              disabled={dismissedIds.has(v.id)}
-                            >
-                              {dismissedIds.has(v.id) ? "Gözardı Edildi" : "Gözardı Et"}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              )}
-
-              {activeTab === "citations" && (
-                <div className="space-y-3">
-                  {citationResults.length === 0 ? (
-                    <div className="py-12 text-center">
-                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
-                        <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-                        </svg>
+                          {dismissedIds.has(v.id) ? "Gözardı Edildi" : "Gözardı Et"}
+                        </button>
                       </div>
-                      <p className="mt-3 text-sm text-gray-500">
-                        Kaynakça doğrulaması için bir atıf stili seçerek analiz başlatın.
-                      </p>
                     </div>
-                  ) : (
-                    citationResults.map((c) => (
-                      <div
-                        key={c.id}
-                        className={`rounded-lg border bg-white p-4 shadow-sm ${
-                          c.isCorrect ? "border-green-200" : "border-red-200"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                                  c.isCorrect
-                                    ? "bg-green-100 text-green-700"
-                                    : "bg-red-100 text-red-700"
-                                }`}
-                              >
-                                {c.isCorrect ? "Doğru" : "Hatalı"}
-                              </span>
-                              {c.sourceType && (
-                                <span className="text-xs text-gray-500">{c.sourceType}</span>
-                              )}
-                              {c.location && (
-                                <span className="truncate text-xs text-gray-400">{c.location}</span>
-                              )}
-                            </div>
+                  );
+                })
+              )}
+            </div>
+          )}
 
-                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                              {!c.isCorrect && c.found && (
-                                <div className="rounded bg-red-50 p-3">
-                                  <p className="text-xs font-medium text-red-700 mb-1">Sizin Yazdığınız</p>
-                                  <p className="text-sm text-red-600 break-words">{c.found}</p>
-                                </div>
-                              )}
-                              {!c.isCorrect && c.expected && (
-                                <div className="rounded bg-green-50 p-3">
-                                  <p className="text-xs font-medium text-green-700 mb-1">Crossref Doğru Format</p>
-                                  <p className="text-sm text-green-600 break-words"
-                                    dangerouslySetInnerHTML={{ __html: c.expected }}
-                                  />
-                                </div>
-                              )}
-                              {c.isCorrect && (
-                                <div className="rounded bg-green-50 p-3 sm:col-span-2">
-                                  <p className="text-sm text-green-700 break-words">{c.citationText}</p>
-                                </div>
-                              )}
-                            </div>
-
-                            {c.issues && typeof c.issues === "object" && Object.keys(c.issues).length > 0 && (
-                              <div className="mt-3 border-t border-gray-100 pt-3">
-                                <p className="text-xs font-medium text-gray-700 mb-2">Tespit Edilen Sorunlar:</p>
-                                <ul className="space-y-1">
-                                  {Object.entries(c.issues).map(([key, value]) => {
-                                    if (value && typeof value === "object" && "message" in value) {
-                                      return (
-                                        <li key={key} className="text-xs text-gray-600">
-                                          <span className="font-medium">{key}:</span>{" "}
-                                          {String((value as Record<string, string>).message)}
-                                        </li>
-                                      );
-                                    }
-                                    return null;
-                                  })}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
+          {activeTab === "citations" && (
+            <div className="space-y-3">
+              {citationResults.length === 0 ? (
+                <div className="py-12 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
+                    <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                    </svg>
+                  </div>
+                  <p className="mt-3 text-sm text-gray-500">
+                    Kaynakça doğrulaması için bir atıf stili seçerek analiz başlatın.
+                  </p>
                 </div>
+              ) : (
+                citationResults.map((c) => (
+                  <div
+                    key={c.id}
+                    className={`rounded-lg border bg-white p-4 shadow-sm ${
+                      c.isCorrect ? "border-green-200" : "border-red-200"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            c.isCorrect ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                          }`}>
+                            {c.isCorrect ? "Doğru" : "Hatalı"}
+                          </span>
+                          {c.sourceType && <span className="text-xs text-gray-500">{c.sourceType}</span>}
+                          {c.location && <span className="truncate text-xs text-gray-400">{c.location}</span>}
+                        </div>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          {!c.isCorrect && c.found && (
+                            <div className="rounded bg-red-50 p-3">
+                              <p className="text-xs font-medium text-red-700 mb-1">Sizin Yazdığınız</p>
+                              <p className="text-sm text-red-600 break-words">{c.found}</p>
+                            </div>
+                          )}
+                          {!c.isCorrect && c.expected && (
+                            <div className="rounded bg-green-50 p-3">
+                              <p className="text-xs font-medium text-green-700 mb-1">Crossref Doğru Format</p>
+                              <p className="text-sm text-green-600 break-words"
+                                dangerouslySetInnerHTML={{ __html: c.expected }}
+                              />
+                            </div>
+                          )}
+                          {c.isCorrect && (
+                            <div className="rounded bg-green-50 p-3 sm:col-span-2">
+                              <p className="text-sm text-green-700 break-words">{c.citationText}</p>
+                            </div>
+                          )}
+                        </div>
+                        {c.issues && typeof c.issues === "object" && Object.keys(c.issues).length > 0 && (
+                          <div className="mt-3 border-t border-gray-100 pt-3">
+                            <p className="text-xs font-medium text-gray-700 mb-2">Tespit Edilen Sorunlar:</p>
+                            <ul className="space-y-1">
+                              {Object.entries(c.issues).map(([key, value]) => {
+                                if (value && typeof value === "object" && "message" in value) {
+                                  return (
+                                    <li key={key} className="text-xs text-gray-600">
+                                      <span className="font-medium">{key}:</span>{" "}
+                                      {String((value as Record<string, string>).message)}
+                                    </li>
+                                  );
+                                }
+                                return null;
+                              })}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           )}
