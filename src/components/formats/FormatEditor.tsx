@@ -381,13 +381,13 @@ export default function FormatEditor({ onSave, onCancel, saving, mode = "create"
         {step === 1 && (<div><p className="text-sm text-gray-500 mb-4">Ana gövde metni (paragraflar) formatı. Tezlerde genelde 1.5 satır aralığı, iki yana yaslı. Sol kenar cilt payı için daha geniş bırakılır (3-4 cm).</p>{renderSectionFields("body")}</div>)}
         {step === 2 && (<div><p className="text-sm text-gray-500 mb-4">1. düzey başlıklar (Ana bölüm başlıkları). Genelde büyük punto, koyu ve ortalanır. Önce 72 pt sonra 18 pt boşluk yaygındır.</p>{renderSectionFields("heading1")}</div>)}
         {step === 3 && (<div><p className="text-sm text-gray-500 mb-4">2. düzey başlıklar (Alt bölüm başlıkları). Önce 18 pt sonra 12 pt boşluk.</p>{renderSectionFields("heading2")}</div>)}
-        {step === 4 && (<div><p className="text-sm text-gray-500 mb-4">3. düzey başlıklar. Önce 12 pt sonra 6 pt boşluk. APA'da kalın + italik.</p>{renderSectionFields("heading3")}</div>)}
+        {step === 4 && (<div><p className="text-sm text-gray-500 mb-4">3. düzey başlıklar. Önce 12 pt sonra 6 pt boşluk. APA{"'"}da kalın + italik.</p>{renderSectionFields("heading3")}</div>)}
         {step === 5 && (<div><p className="text-sm text-gray-500 mb-4">Özet (Abstract) bölümü. Tezlerde 1 satır aralığı, 200-400 kelime arası.</p>{renderSectionFields("abstract")}</div>)}
         {step === 6 && (<div><p className="text-sm text-gray-500 mb-4">Dipnot (Footnote) formatı. Genelde 8-10 punto, 1 satır aralığı. Sayfa altında metin sınırları içinde.</p>{renderSectionFields("footnote")}</div>)}
         {step === 7 && (<div><p className="text-sm text-gray-500 mb-4">Uzun doğrudan alıntı (Block Quote). 3 satırdan uzun alıntılar genelde daha küçük punto, soldan girintili, sıkıştırılmış paragraf.</p>{renderSectionFields("blockQuote")}</div>)}
         {step === 8 && (
           <div>
-            <p className="text-sm text-gray-500 mb-4">Kaynakça (References) bölümü formatı ve kullanılacak atıf stili. APA'da asılı girinti kullanılır.</p>
+            <p className="text-sm text-gray-500 mb-4">Kaynakça (References) bölümü formatı ve kullanılacak atıf stili. APA{"'"}da asılı girinti kullanılır.</p>
             {(() => {
               const data = form.bibliography as Record<string, unknown>;
               return (
@@ -436,7 +436,7 @@ export default function FormatEditor({ onSave, onCancel, saving, mode = "create"
             </div>
           </div>
         )}
-        {step === 10 && (<div><p className="text-sm text-gray-500 mb-4">Tablolar için format kuralları.</p><div className="max-w-lg"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={form.tables.insideBorders ?? false} onChange={(e) => setForm({ ...form, tables: { insideBorders: e.target.checked || undefined } })} className="rounded border-gray-300" /><span className="text-sm text-gray-700">Tablo içi kenar çizgileri (APA'da sadece yatay çizgiler)</span></label></div></div>)}
+        {step === 10 && (<div><p className="text-sm text-gray-500 mb-4">Tablolar için format kuralları.</p><div className="max-w-lg"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={form.tables.insideBorders ?? false} onChange={(e) => setForm({ ...form, tables: { insideBorders: e.target.checked || undefined } })} className="rounded border-gray-300" /><span className="text-sm text-gray-700">Tablo içi kenar çizgileri (APA{"'"}da sadece yatay çizgiler)</span></label></div></div>)}
         {step === 11 && (
           <div>
             <p className="text-sm text-gray-500 mb-4">Oluşturulacak şablonun özetini kontrol edin.</p>

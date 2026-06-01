@@ -28,3 +28,49 @@
     @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
   }
 }
+
+.violation-hl {
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background-color 0.15s;
+}
+.violation-hl:hover {
+  filter: brightness(0.95);
+}
+
+.violation-error {
+  text-decoration-color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.08);
+}
+
+.violation-warning {
+  text-decoration-color: #f59e0b;
+  background-color: rgba(245, 158, 11, 0.08);
+}
+
+.violation-info {
+  text-decoration-color: #3b82f6;
+  background-color: rgba(59, 130, 246, 0.08);
+}
+
+.ProseMirror {
+  outline: none;
+  min-height: 500px;
+  padding: 2rem;
+  font-family: "Times New Roman", serif;
+  font-size: 12pt;
+  line-height: 1.5;
+  color: #111827;
+}
+
+.ProseMirror p {
+  margin-top: 0;
+  margin-bottom: 0.5em;
+}
+
+.ProseMirror p:last-child {
+  margin-bottom: 0;
+}

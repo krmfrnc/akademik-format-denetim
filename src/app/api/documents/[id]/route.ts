@@ -3,6 +3,35 @@ import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/get-auth-user";
 import { apiSuccess, apiError, AppError } from "@/lib/utils";
 import { deleteDocument } from "@/services/document.service";
+import { parseDocxBuffer } from "@/services/docx-analyzer";
+import { parsedDocxToHtml } from "@/services/docx-to-html";
+
+async function getDocumentHtml(fileUrl: string): Promise<string | null> {
+  try {
+    if (fileUrl.includes("blob.vercel-storage.com")) {
+      const response = await fetch(fileUrl);
+      if (!response.ok) return null;
+      const buffer = await response.arrayBuffer();
+      const parsed = await parseDocxBuffer(buffer);
+      return parsedDocxToHtml(parsed);
+    }
+    if (fileUrl.startsWith("/api/documents/file/")) {
+      const relativePath = fileUrl.replace("/api/documents/file/", "");
+      const storageConfig = await prisma.systemConfig.findUnique({
+        where: { key: "storage.local_path" },
+      });
+      const storagePath = (storageConfig?.value as string) ?? "/uploads/documents";
+      const absolutePath = `${process.cwd()}/${storagePath}/${relativePath}`;
+      const fs = await import("fs/promises");
+      const buffer = await fs.readFile(absolutePath);
+      const parsed = await parseDocxBuffer(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
+      return parsedDocxToHtml(parsed);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 export async function GET(
   request: NextRequest,
@@ -13,6 +42,9 @@ export async function GET(
     if (!user) {
       return apiError("Oturum açmanız gerekiyor.", 401, "UNAUTHORIZED");
     }
+
+    const { searchParams } = new URL(request.url);
+    const includeHtml = searchParams.get("includeHtml") === "true";
 
     const document = await prisma.document.findFirst({
       where: { id: params.id, userId: user.sub },
@@ -43,6 +75,11 @@ export async function GET(
 
     const lastAnalysis = document.analyses[0] ?? null;
 
+    let html: string | null = null;
+    if (includeHtml) {
+      html = await getDocumentHtml(document.fileUrl);
+    }
+
     return apiSuccess({
       id: document.id,
       fileName: document.fileName,
@@ -56,6 +93,7 @@ export async function GET(
       errorMessage: document.errorMessage,
       createdAt: document.createdAt,
       updatedAt: document.updatedAt,
+      html,
       analysis: lastAnalysis
         ? {
             id: lastAnalysis.id,
