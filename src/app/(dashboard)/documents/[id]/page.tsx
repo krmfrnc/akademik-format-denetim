@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useMemo } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { apiGet, apiPost } from "@/lib/api-client";
 import ViolationWizard from "@/components/documents/ViolationWizard";
 
@@ -86,12 +86,16 @@ const violationTypeLabels: Record<string, string> = {
   OTHER: "Diğer",
 };
 
-export default function DocumentDetailPage() {
-  const params = useParams();
+export default function DocumentDetailPage({
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const params = useParams();
   const documentId = params.id as string;
-  const initialWizard = searchParams.get("wizard") === "1";
+  const initialWizard = searchParams.wizard === "1";
 
   const [document, setDocument] = useState<DocumentDetail | null>(null);
   const [loading, setLoading] = useState(true);
