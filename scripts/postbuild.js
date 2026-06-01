@@ -7,13 +7,23 @@ const exportDetailPath = path.join(dotNext, "export-detail.json");
 console.log("[postbuild] Checking export-detail.json...");
 console.log("[postbuild] .next exists:", fs.existsSync(dotNext));
 
-if (!fs.existsSync(exportDetailPath)) {
-  fs.writeFileSync(exportDetailPath, JSON.stringify({ version: 1 }));
-  console.log("[postbuild] Created export-detail.json");
-} else {
-  console.log("[postbuild] export-detail.json already exists");
-}
+const exportDetail = {
+  version: 1,
+  pages: [],
+  appRoutes: [],
+  dynamicRoutes: [],
+  notFoundRoutes: [],
+};
 
-const files = fs.readdirSync(dotNext);
-const traceFiles = files.filter((f) => f.includes("trace") || f.includes("export") || f.includes("standalone"));
-console.log("[postbuild] Trace-related files in .next:", traceFiles.join(", "));
+if (!fs.existsSync(exportDetailPath)) {
+  fs.writeFileSync(exportDetailPath, JSON.stringify(exportDetail, null, 2));
+  console.log("[postbuild] Created export-detail.json with full structure");
+} else {
+  const existing = JSON.parse(fs.readFileSync(exportDetailPath, "utf8"));
+  if (!existing.pages && !existing.appRoutes) {
+    fs.writeFileSync(exportDetailPath, JSON.stringify(exportDetail, null, 2));
+    console.log("[postbuild] Updated export-detail.json with full structure");
+  } else {
+    console.log("[postbuild] export-detail.json already has full structure");
+  }
+}
