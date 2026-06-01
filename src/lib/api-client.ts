@@ -158,65 +158,76 @@ export async function apiUpload<T = unknown>(
   formData: FormData,
   onProgress?: (percent: number) => void,
 ): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    const token = getToken();
+  const sendXHR = (token: string | null): Promise<T> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", path);
 
-    xhr.open("POST", path);
-
-    if (token) {
-      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-    }
-
-    xhr.upload.addEventListener("progress", (e) => {
-      if (e.lengthComputable && onProgress) {
-        onProgress(Math.round((e.loaded / e.total) * 100));
+      if (token) {
+        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
       }
-    });
 
-    xhr.addEventListener("load", async () => {
-      if (xhr.status === 401 || xhr.status === 403) {
-        const refreshed = await refreshAccessToken();
-        if (!refreshed) {
-          clearAuthAndRedirect();
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable && onProgress) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
         }
-        reject(new Error("Oturum süresi doldu. Lütfen sayfayı yenileyip tekrar deneyin."));
-        return;
-      }
+      });
 
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const json = JSON.parse(xhr.responseText);
-          if (json.success) {
-            resolve(json.data as T);
-          } else {
-            reject(new Error(json.error?.message || "Yükleme başarısız"));
+      xhr.addEventListener("load", () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const json = JSON.parse(xhr.responseText);
+            if (json.success) {
+              resolve(json.data as T);
+            } else {
+              reject(new Error(json.error?.message || "Yükleme başarısız"));
+            }
+          } catch {
+            reject(new Error("Sunucu yanıtı işlenemedi"));
           }
-        } catch {
-          reject(new Error("Sunucu yanıtı işlenemedi"));
+        } else if (xhr.status === 413) {
+          reject(new Error(
+            "Dosya boyutu sunucu limitini aşıyor (HTTP 413). " +
+            "Lütfen dosyayı küçültün veya yöneticinizle iletişime geçin. " +
+            "Maksimum dosya boyutu: ücretsiz kullanıcılar için 10 MB, aboneler için 50 MB."
+          ));
+        } else {
+          const status = xhr.status;
+          try {
+            const json = JSON.parse(xhr.responseText);
+            reject(new Error(json.error?.message || `HTTP ${status}`));
+          } catch {
+            reject(new Error(`HTTP ${status}`));
+          }
         }
-      } else if (xhr.status === 413) {
-        reject(new Error(
-          "Dosya boyutu sunucu limitini aşıyor (HTTP 413). " +
-          "Lütfen dosyayı küçültün veya yöneticinizle iletişime geçin. " +
-          "Maksimum dosya boyutu: ücretsiz kullanıcılar için 10 MB, aboneler için 50 MB."
-        ));
-      } else {
-        try {
-          const json = JSON.parse(xhr.responseText);
-          reject(new Error(json.error?.message || `HTTP ${xhr.status}`));
-        } catch {
-          reject(new Error(`HTTP ${xhr.status}`));
-        }
+      });
+
+      xhr.addEventListener("error", () => {
+        reject(new Error("Ağ hatası oluştu"));
+      });
+
+      xhr.send(formData);
+    });
+  };
+
+  try {
+    return await sendXHR(getToken());
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    const isAuthError =
+      message.startsWith("HTTP 401") ||
+      message.startsWith("HTTP 403");
+
+    if (isAuthError) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        return await sendXHR(getToken());
       }
-    });
-
-    xhr.addEventListener("error", () => {
-      reject(new Error("Ağ hatası oluştu"));
-    });
-
-    xhr.send(formData);
-  });
+      clearAuthAndRedirect();
+      throw new Error("Oturum süresi doldu, giriş sayfasına yönlendiriliyorsunuz.");
+    }
+    throw err;
+  }
 }
 
 export function getClientAuthUser(): { id: string; name: string; email: string; role: string } | null {
