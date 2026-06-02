@@ -37,6 +37,7 @@ export async function GET(
     const formatTemplate = document.analyses[0]?.formatTemplate;
 
     const isVercelBlob = document.fileUrl.includes("blob.vercel-storage.com");
+    const isCustomStorage = document.fileUrl.startsWith("/storage/");
 
     let fetchUrl = document.fileUrl;
     if (isVercelBlob) {
@@ -46,6 +47,9 @@ export async function GET(
           ? `${document.fileUrl}&token=${token}`
           : `${document.fileUrl}?token=${token}`;
       }
+    } else if (isCustomStorage) {
+      const storageBase = process.env.STORAGE_SERVER_URL;
+      fetchUrl = `${storageBase}${document.fileUrl}`;
     }
 
     const response = await fetch(fetchUrl);

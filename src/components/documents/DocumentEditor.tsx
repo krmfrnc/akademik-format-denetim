@@ -13,6 +13,7 @@ import type { Editor } from "@tiptap/core";
 
 import EditorToolbar from "./EditorToolbar";
 import ViolationPopover from "./ViolationPopover";
+import { apiGet } from "@/lib/api-client";
 
 interface ViolationData {
   id: string;
@@ -27,22 +28,15 @@ interface ViolationData {
 }
 
 interface DocumentEditorProps {
+  documentId: string;
   violations: ViolationData[];
   onDismissedChange?: (ids: Set<string>) => void;
 }
 
-function generatePlaceholderHtml(violations: ViolationData[]): string {
-  const maxPara = violations.reduce((max, v) => {
-    const idx = parseParagraphIndex(v.location);
-    return idx !== null && idx > max ? idx : max;
-  }, 0);
-  const parts: string[] = [];
-  for (let i = 0; i <= maxPara; i++) {
-    const v = violations.find((x) => parseParagraphIndex(x.location) === i);
-    const loc = v ? v.location : `Paragraf ${i + 1}`;
-    parts.push(`<p data-para-index="${i}">${loc}</p>`);
-  }
-  return parts.join("\n");
+interface DocumentContentResponse {
+  html: string;
+  paragraphCount: number;
+  wordCount: number;
 }
 
 function parseParagraphIndex(location: string | null): number | null {
@@ -141,19 +135,48 @@ function selectParagraphByIndex(editor: Editor, paraIdx: number): { from: number
   return result;
 }
 
-export default function DocumentEditor({ violations: initialViolations, onDismissedChange }: DocumentEditorProps) {
+export default function DocumentEditor({ documentId, violations: initialViolations, onDismissedChange }: DocumentEditorProps) {
   const [htmlContent, setHtmlContent] = useState<string>("");
   const [violations, setViolations] = useState<ViolationData[]>([]);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [activeViolation, setActiveViolation] = useState<ViolationData | null>(null);
   const [popoverPosition, setPopoverPosition] = useState<{ top: number; left: number } | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setViolations(initialViolations);
-    setHtmlContent(generatePlaceholderHtml(initialViolations));
   }, [initialViolations]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!documentId) return;
+
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const result = await apiGet<DocumentContentResponse>(
+          `/api/documents/${documentId}/content`,
+        );
+        if (cancelled) return;
+        setHtmlContent(result.html || "<p></p>");
+      } catch (err) {
+        if (cancelled) return;
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Belge içeriği yüklenirken bir hata oluştu.",
+        );
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [documentId]);
 
   useEffect(() => {
     onDismissedChange?.(dismissedIds);

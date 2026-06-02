@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { apiGet, apiPost, apiDelete } from "@/lib/api-client";
 
 const DocumentEditor = dynamic(() => import("@/components/documents/DocumentEditor"), { ssr: false });
+const OnlyOfficeEditor = dynamic(() => import("@/components/documents/OnlyOfficeEditor"), { ssr: false });
 const ViolationSidebar = dynamic(() => import("@/components/documents/ViolationSidebar"), { ssr: false });
 
 interface ViolationData {
@@ -103,6 +104,7 @@ export default function DocumentDetailPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [viewMode, setViewMode] = useState<"editor" | "list">("editor");
+  const [editorEngine, setEditorEngine] = useState<"tiptap" | "onlyoffice">("onlyoffice");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeSidebarViolationId, setActiveSidebarViolationId] = useState<string | null>(null);
 
@@ -401,7 +403,7 @@ export default function DocumentDetailPage() {
       )}
 
       {analysis && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex gap-2">
             <button
               onClick={() => setViewMode("editor")}
@@ -425,21 +427,34 @@ export default function DocumentDetailPage() {
             </button>
           </div>
 
-          <div className="flex gap-2 items-center">
-            {dismissedIds.size > 0 && (
-              <button onClick={handleRestoreAll} className="text-xs text-gray-500 hover:text-gray-700">
-                Tümünü geri yükle
-              </button>
-            )}
-            {viewMode === "editor" && (
+          {viewMode === "editor" && (
+            <div className="flex gap-2">
+              <select
+                value={editorEngine}
+                onChange={(e) => setEditorEngine(e.target.value as "tiptap" | "onlyoffice")}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600"
+              >
+                <option value="onlyoffice">OnlyOffice (Gerçek Word)</option>
+                <option value="tiptap">TipTap (Basit Editör)</option>
+              </select>
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
                 className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors"
               >
                 {sidebarOpen ? "Sidebar'ı Gizle" : "Sidebar'ı Göster"}
               </button>
-            )}
-          </div>
+            </div>
+          )}
+
+          {viewMode !== "editor" && (
+            <div className="flex gap-2">
+              {dismissedIds.size > 0 && (
+                <button onClick={handleRestoreAll} className="text-xs text-gray-500 hover:text-gray-700">
+                  Tümünü geri yükle
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -456,7 +471,11 @@ export default function DocumentDetailPage() {
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <DocumentEditor violations={violations} />
+            {editorEngine === "onlyoffice" ? (
+              <OnlyOfficeEditor documentId={documentId} />
+            ) : (
+              <DocumentEditor documentId={documentId} violations={violations} />
+            )}
           </div>
         </div>
       )}

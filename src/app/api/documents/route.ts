@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthUser } from "@/lib/get-auth-user";
 import { apiSuccess, apiError, AppError } from "@/lib/utils";
+import { uploadToStorageServer } from "@/lib/storage-client";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -142,10 +143,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    const storageConfig = await prisma.systemConfig.findUnique({
-      where: { key: "storage.type" },
-    });
-    const storageType = (storageConfig?.value as string) ?? "local";
+    const storageType = process.env.DEFAULT_STORAGE_TYPE ?? "vercel_blob";
     const storagePath =
       ((await prisma.systemConfig.findUnique({
         where: { key: "storage.local_path" },
@@ -161,6 +159,9 @@ export async function POST(request: NextRequest): Promise<Response> {
         contentType: file.type || validTypes[0],
       });
       fileUrl = blob.url;
+    } else if (storageType === "custom") {
+      const uniqueName = `${crypto.randomUUID()}.docx`;
+      fileUrl = await uploadToStorageServer(user.sub, uniqueName, buffer);
     } else if (storageType === "s3") {
       fileUrl = `https://storage.example.com/documents/${user.sub}/${file.name}`;
     } else {
