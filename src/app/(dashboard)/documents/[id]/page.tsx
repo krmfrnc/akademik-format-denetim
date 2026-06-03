@@ -5,9 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { apiGet, apiPost, apiDelete } from "@/lib/api-client";
 
-const DocumentEditor = dynamic(() => import("@/components/documents/DocumentEditor"), { ssr: false });
 const OnlyOfficeEditor = dynamic(() => import("@/components/documents/OnlyOfficeEditor"), { ssr: false });
-const ViolationSidebar = dynamic(() => import("@/components/documents/ViolationSidebar"), { ssr: false });
 
 interface ViolationData {
   id: string;
@@ -104,9 +102,6 @@ export default function DocumentDetailPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [viewMode, setViewMode] = useState<"editor" | "list">("editor");
-  const [editorEngine, setEditorEngine] = useState<"tiptap" | "onlyoffice">("onlyoffice");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeSidebarViolationId, setActiveSidebarViolationId] = useState<string | null>(null);
 
   const fetchDocument = useCallback(async () => {
     try {
@@ -174,15 +169,6 @@ export default function DocumentDetailPage() {
       setError(err instanceof Error ? err.message : "Belge silinirken bir hata oluştu.");
       setDeleting(false);
     }
-  };
-
-  const handleSidebarViolationClick = (violation: ViolationData) => {
-    setActiveSidebarViolationId(violation.id);
-    if (viewMode !== "editor") setViewMode("editor");
-    setTimeout(() => {
-      const el = window.document.querySelector(`[data-violation-id="${violation.id}"]`);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 150);
   };
 
   const getScoreColor = (score: number): string => {
@@ -423,62 +409,20 @@ export default function DocumentDetailPage() {
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
             >
-              Tümünü Listele
+              İhlalleri Listele
             </button>
           </div>
-
-          {viewMode === "editor" && (
-            <div className="flex gap-2">
-              <select
-                value={editorEngine}
-                onChange={(e) => setEditorEngine(e.target.value as "tiptap" | "onlyoffice")}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600"
-              >
-                <option value="onlyoffice">OnlyOffice (Gerçek Word)</option>
-                <option value="tiptap">TipTap (Basit Editör)</option>
-              </select>
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors"
-              >
-                {sidebarOpen ? "Sidebar'ı Gizle" : "Sidebar'ı Göster"}
-              </button>
-            </div>
-          )}
-
-          {viewMode !== "editor" && (
-            <div className="flex gap-2">
-              {dismissedIds.size > 0 && (
-                <button onClick={handleRestoreAll} className="text-xs text-gray-500 hover:text-gray-700">
-                  Tümünü geri yükle
-                </button>
-              )}
-            </div>
+          {dismissedIds.size > 0 && (
+            <button onClick={handleRestoreAll} className="text-xs text-gray-500 hover:text-gray-700">
+              Tümünü geri yükle
+            </button>
           )}
         </div>
       )}
 
-      {analysis && viewMode === "editor" && (
-        <div className="flex gap-4">
-          {sidebarOpen && (
-            <div className="w-64 flex-shrink-0 rounded-lg border border-gray-200 bg-white">
-              <ViolationSidebar
-                violations={violations}
-                dismissedIds={dismissedIds}
-                onViolationClick={handleSidebarViolationClick}
-                activeViolationId={activeSidebarViolationId}
-              />
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            {editorEngine === "onlyoffice" ? (
-              <OnlyOfficeEditor documentId={documentId} />
-            ) : (
-              <DocumentEditor documentId={documentId} violations={violations} />
-            )}
-          </div>
-        </div>
-      )}
+      <div className="flex-1 min-w-0">
+        <OnlyOfficeEditor documentId={documentId} />
+      </div>
 
       {viewMode === "list" && (
         <div className="card">
