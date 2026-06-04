@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { apiGet } from "@/lib/api-client";
 
 interface OnlyOfficeEditorConfig {
   token: string;
-  onlyofficeUrl: string;
+  config: Record<string, unknown>;
   serverUrl: string;
   documentUrl: string;
 }
@@ -14,27 +14,100 @@ interface OnlyOfficeEditorProps {
   documentId: string;
 }
 
+type DocEditorInstance = {
+  destroyEditor: () => void;
+  showMessage: (message: string) => void;
+};
+
+declare global {
+  interface Window {
+    DocsAPI?: {
+      DocEditor: new (
+        placeholderId: string,
+        config: Record<string, unknown>,
+      ) => DocEditorInstance;
+    };
+  }
+}
+
 export default function OnlyOfficeEditor({ documentId }: OnlyOfficeEditorProps) {
-  const [config, setConfig] = useState<OnlyOfficeEditorConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const editorRef = useRef<DocEditorInstance | null>(null);
+  const placeholderId = `onlyoffice-editor-${documentId}`;
+
+  const loadScript = useCallback(
+    (serverUrl: string): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        if (window.DocsAPI?.DocEditor) {
+          resolve();
+          return;
+        }
+
+        const existingScript = document.querySelector(
+          `script[src="${serverUrl}/web-apps/apps/api/documents/api.js"]`,
+        );
+        if (existingScript) {
+          existingScript.addEventListener("load", () => resolve());
+          existingScript.addEventListener("error", () =>
+            reject(new Error("OnlyOffice API yüklenemedi.")),
+          );
+          return;
+        }
+
+        const script = document.createElement("script");
+        script.src = `${serverUrl}/web-apps/apps/api/documents/api.js`;
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () =>
+          reject(new Error("OnlyOffice API yüklenemedi."));
+        document.head.appendChild(script);
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!documentId) return;
+
+    let cancelled = false;
 
     (async () => {
       try {
         const result = await apiGet<OnlyOfficeEditorConfig>(
           `/api/documents/${documentId}/editor`,
         );
-        setConfig(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Editör yüklenemedi.");
-      } finally {
+
+        if (cancelled) return;
+
+        await loadScript(result.serverUrl);
+
+        if (cancelled) return;
+
+        editorRef.current?.destroyEditor();
+
+        const editor = new window.DocsAPI!.DocEditor(
+          placeholderId,
+          result.config,
+        );
+        editorRef.current = editor;
         setLoading(false);
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error ? err.message : "Editör yüklenemedi.",
+          );
+          setLoading(false);
+        }
       }
     })();
-  }, [documentId]);
+
+    return () => {
+      cancelled = true;
+      editorRef.current?.destroyEditor();
+      editorRef.current = null;
+    };
+  }, [documentId, placeholderId, loadScript]);
 
   if (loading) {
     return (
@@ -48,17 +121,23 @@ export default function OnlyOfficeEditor({ documentId }: OnlyOfficeEditorProps) 
   if (error) {
     return (
       <div className="flex h-[680px] flex-col items-center justify-center gap-4 rounded-lg border border-red-200 bg-red-50">
-        <svg className="h-12 w-12 text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+        <svg
+          className="h-12 w-12 text-red-400"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={1.5}
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+          />
         </svg>
         <p className="text-sm text-red-600">{error}</p>
       </div>
     );
   }
-
-  if (!config) return null;
-
-  const editorUrl = `${config.onlyofficeUrl}?jwt=${encodeURIComponent(config.token)}`;
 
   return (
     <div className="flex flex-col gap-3">
@@ -70,20 +149,13 @@ export default function OnlyOfficeEditor({ documentId }: OnlyOfficeEditorProps) 
               <span className="h-3 w-3 rounded-full bg-yellow-400" />
               <span className="h-3 w-3 rounded-full bg-green-400" />
             </div>
-            <span className="text-xs text-gray-500">OnlyOffice Document Editor — Gerçek Word Deneyimi</span>
+            <span className="text-xs text-gray-500">
+              OnlyOffice Document Editor — Gerçek Word Deneyimi
+            </span>
           </div>
-          <span className="text-xs text-green-600 font-medium">✓ Aktif</span>
+          <span className="text-xs text-green-600 font-medium">&check; Aktif</span>
         </div>
-        <iframe
-          key={config.token}
-          src={editorUrl}
-          width="100%"
-          height="680"
-          frameBorder="0"
-          allow="clipboard-write; clipboard-read; clipboard-cut; clipboard-paste"
-          title="OnlyOffice Document Editor"
-          className="block"
-        />
+        <div id={placeholderId} style={{ height: 680 }} />
       </div>
     </div>
   );

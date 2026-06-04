@@ -61,7 +61,14 @@ export async function GET(
 
     return apiSuccess({
       token,
-      onlyofficeUrl: `${ONLYOFFICE_SERVER}/web-apps/apps/api/documents/sharedocument`,
+      config: {
+        ...config,
+        token,
+        documentType: "word",
+        type: "desktop",
+        width: "100%",
+        height: "680px",
+      },
       serverUrl: ONLYOFFICE_SERVER,
       documentUrl: docUrl,
     });
