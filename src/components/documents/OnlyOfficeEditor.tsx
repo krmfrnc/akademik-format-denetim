@@ -86,9 +86,30 @@ export default function OnlyOfficeEditor({ documentId }: OnlyOfficeEditorProps) 
 
         editorRef.current?.destroyEditor();
 
+        const configWithEvents = {
+          ...(result.config as Record<string, unknown>),
+          events: {
+            onAppReady: () => {
+              console.log("[OnlyOffice] Editor ready");
+            },
+            onDocumentReady: () => {
+              console.log("[OnlyOffice] Document ready");
+            },
+            onError: (event: Record<string, unknown>) => {
+              console.error("[OnlyOffice] Editor error:", event);
+              setError(
+                `Belge yüklenemedi: ${String(event?.message || event?.data || "Bilinmeyen hata")}`,
+              );
+            },
+            onRequestClose: () => {
+              console.log("[OnlyOffice] Close requested");
+            },
+          },
+        };
+
         const editor = new window.DocsAPI!.DocEditor(
           placeholderId,
-          result.config,
+          configWithEvents,
         );
         editorRef.current = editor;
         setLoading(false);
