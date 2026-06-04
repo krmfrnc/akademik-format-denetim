@@ -61,7 +61,7 @@ export async function GET(
 
     return apiSuccess({
       token,
-      onlyofficeUrl: `${ONLYOFFICE_SERVER}/apps/api/documents/sharedocument`,
+      onlyofficeUrl: `${ONLYOFFICE_SERVER}/web-apps/apps/api/documents/sharedocument`,
       serverUrl: ONLYOFFICE_SERVER,
       documentUrl: docUrl,
     });
