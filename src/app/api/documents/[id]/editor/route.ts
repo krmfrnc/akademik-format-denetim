@@ -64,7 +64,6 @@ export async function GET(
       config: {
         ...config,
         token,
-        documentType: "word",
         type: "desktop",
         width: "100%",
         height: "680px",

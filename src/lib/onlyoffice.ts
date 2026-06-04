@@ -5,13 +5,12 @@ interface OnlyOfficeDocumentConfig {
   title: string;
   url: string;
   fileType: string;
-}
-
-interface OnlyOfficePermissions {
-  edit: boolean;
-  download: boolean;
-  print: boolean;
-  comment: boolean;
+  permissions: {
+    edit: boolean;
+    download: boolean;
+    print: boolean;
+    comment: boolean;
+  };
 }
 
 interface OnlyOfficeEditorConfig {
@@ -25,7 +24,7 @@ interface OnlyOfficeEditorConfig {
 
 export interface OnlyOfficeTokenPayload {
   document: OnlyOfficeDocumentConfig;
-  permissions: OnlyOfficePermissions;
+  documentType: string;
   editorConfig: OnlyOfficeEditorConfig;
 }
 
@@ -59,13 +58,14 @@ export function buildOnlyOfficeConfig(
       title: fileName,
       url: documentUrl,
       fileType: "docx",
+      permissions: {
+        edit: true,
+        download: true,
+        print: false,
+        comment: false,
+      },
     },
-    permissions: {
-      edit: true,
-      download: true,
-      print: false,
-      comment: false,
-    },
+    documentType: "word",
     editorConfig: {
       callbackUrl,
       user: {
