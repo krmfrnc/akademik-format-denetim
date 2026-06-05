@@ -93,25 +93,30 @@ export async function GET(
 
     const isVercelBlob = document.fileUrl.includes("blob.vercel-storage.com");
     const isCustomStorage = document.fileUrl.startsWith("/storage/");
-    let fetchUrl = document.fileUrl;
+    let buffer: ArrayBuffer;
+
     if (isVercelBlob) {
-      const token = process.env.BLOB_READ_WRITE_TOKEN;
-      if (token) {
-        fetchUrl = document.fileUrl.includes("?")
-          ? `${document.fileUrl}&token=${token}`
-          : `${document.fileUrl}?token=${token}`;
+      const { get } = await import("@vercel/blob");
+      const blobResult = await get(document.fileUrl, {
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+        access: "private",
+      });
+      if (!blobResult) {
+        return apiError("Belge dosyasına erişilemedi.", 500, "FILE_FETCH_ERROR");
       }
-    } else if (isCustomStorage) {
-      const storageBase = process.env.STORAGE_SERVER_URL;
-      fetchUrl = `${storageBase}${document.fileUrl}`;
+      buffer = await new Response(blobResult.stream).arrayBuffer();
+    } else {
+      let fetchUrl = document.fileUrl;
+      if (isCustomStorage) {
+        const storageBase = process.env.STORAGE_SERVER_URL;
+        fetchUrl = `${storageBase}${document.fileUrl}`;
+      }
+      const response = await fetch(fetchUrl);
+      if (!response.ok) {
+        return apiError("Belge dosyasına erişilemedi.", 500, "FILE_FETCH_ERROR");
+      }
+      buffer = await response.arrayBuffer();
     }
-
-    const response = await fetch(fetchUrl);
-    if (!response.ok) {
-      return apiError("Belge dosyasına erişilemedi.", 500, "FILE_FETCH_ERROR");
-    }
-
-    const buffer = await response.arrayBuffer();
     const parsed = await parseDocxBuffer(buffer);
 
     const html = parsed.paragraphs

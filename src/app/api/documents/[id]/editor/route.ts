@@ -37,9 +37,29 @@ export async function GET(
     if (isVercelBlob) {
       const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
       if (blobToken) {
-        docUrl = document.fileUrl.includes("?")
-          ? `${document.fileUrl}&token=${blobToken}`
-          : `${document.fileUrl}?token=${blobToken}`;
+        try {
+          const { issueSignedToken, presignUrl } = await import("@vercel/blob");
+          const urlObj = new URL(document.fileUrl);
+          const pathname = decodeURIComponent(urlObj.pathname.slice(1));
+          const signedToken = await issueSignedToken({
+            pathname,
+            operations: ["get"],
+            token: blobToken,
+          });
+          const signedUrlObj = await presignUrl(signedToken, {
+            pathname,
+            operation: "get",
+            access: "private",
+            validUntil: Date.now() + 60 * 60 * 1000, // 1 hour
+          });
+          docUrl = signedUrlObj.presignedUrl;
+        } catch (err) {
+          console.error("Vercel Blob URL signing failed:", err);
+          // Fallback to query param token if signing fails
+          docUrl = document.fileUrl.includes("?")
+            ? `${document.fileUrl}&token=${blobToken}`
+            : `${document.fileUrl}?token=${blobToken}`;
+        }
       }
     } else if (isCustomStorage) {
       const storageBase = process.env.STORAGE_SERVER_URL;
