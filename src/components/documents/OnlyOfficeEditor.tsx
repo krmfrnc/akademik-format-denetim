@@ -130,39 +130,9 @@ export default function OnlyOfficeEditor({ documentId }: OnlyOfficeEditorProps) 
     };
   }, [documentId, placeholderId, loadScript]);
 
-  if (loading) {
-    return (
-      <div className="flex h-[680px] flex-col items-center justify-center gap-4 rounded-lg border border-gray-200 bg-gray-50">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
-        <p className="text-sm text-gray-500">OnlyOffice editörü yükleniyor...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex h-[680px] flex-col items-center justify-center gap-4 rounded-lg border border-red-200 bg-red-50">
-        <svg
-          className="h-12 w-12 text-red-400"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={1.5}
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-          />
-        </svg>
-        <p className="text-sm text-red-600">{error}</p>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-3">
-      <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+      <div className="rounded-lg border border-gray-200 bg-white overflow-hidden relative">
         <div className="bg-gray-100 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex gap-1.5">
@@ -174,8 +144,37 @@ export default function OnlyOfficeEditor({ documentId }: OnlyOfficeEditorProps) 
               OnlyOffice Document Editor — Gerçek Word Deneyimi
             </span>
           </div>
-          <span className="text-xs text-green-600 font-medium">&check; Aktif</span>
+          <span className="text-xs text-green-600 font-medium">✓ Aktif</span>
         </div>
+
+        {/* Loading Overlay */}
+        {loading && (
+          <div className="absolute inset-0 top-8 flex flex-col items-center justify-center gap-4 bg-gray-50 z-10">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+            <p className="text-sm text-gray-500">OnlyOffice editörü yükleniyor...</p>
+          </div>
+        )}
+
+        {/* Error Overlay */}
+        {error && (
+          <div className="absolute inset-0 top-8 flex flex-col items-center justify-center gap-4 bg-red-50 z-10">
+            <svg
+              className="h-12 w-12 text-red-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+              />
+            </svg>
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+        )}
+
         <div id={placeholderId} style={{ height: 680 }} />
       </div>
     </div>
